@@ -1,0 +1,30 @@
+
+[package]
+name = "diff_doc"
+version = "0.10.0"
+edition = "2024"
+
+
+[dependencies]
+#json_diff_ng = "0.6"
+
+diffs = "0.5"
+
+# plain text diff
+diffy="0.4"
+
+# yaml diff nothing
+
+
+chrono = "0.4.19"
+
+tokio = { version = "*", features = ["rt", "rt-multi-thread", "macros"] }
+serde_json = "1.0.140"
+thiserror = "1.0.69"
+
+vg_errortools = "0.1"
+regex = "1.11.1"
+
+
+[dev-dependencies.maplit]
+version = "1.0"
