@@ -23,19 +23,18 @@ pub fn compare_strs(
 ) -> Result<Mismatch> {
     let value1 = serde_json::from_str(a)?;
     let value2 = serde_json::from_str(b)?;
-    compare_serde_values(&value1, &value2, sort_arrays, ignore_keys)
+    match_json(&value1, &value2, sort_arrays, ignore_keys)
 }
 
 /// Compares two [`serde_json::Value`] items with each other, returns an error or a [`Mismatch`] structure holding all differences.
 /// Arguments are the values, a bool to trigger deep sorting of arrays and ignored_keys as a list of regex to match keys against.
 /// Ignoring a regex from comparison will also ignore the key from having an impact on sorting arrays.
-pub fn compare_serde_values(
+pub fn compare_json(
     a: &Value,
     b: &Value,
-    sort_arrays: bool,
     ignore_keys: &[Regex],
 ) -> Result<Mismatch> {
-    match_json(a, b, sort_arrays, ignore_keys)
+    match_json(a, b, false, ignore_keys)
 }
 
 fn values_to_node(vec: Vec<(usize, &Value)>) -> DiffTreeNode {
@@ -68,6 +67,7 @@ impl<'a> ListDiffHandler<'a> {
         }
     }
 }
+
 impl<'a> Diff for ListDiffHandler<'a> {
     type Error = ();
     fn delete(&mut self, old: usize, len: usize, _new: usize) -> std::result::Result<(), ()> {
@@ -90,7 +90,7 @@ impl<'a> Diff for ListDiffHandler<'a> {
     }
 }
 
-fn match_json(
+pub fn match_json(
     value1: &Value,
     value2: &Value,
     sort_arrays: bool,
@@ -122,8 +122,8 @@ fn process_objects(
     sort_arrays: bool,
 ) -> Result<Mismatch> {
     let diff = intersect_maps(a, b, ignore_keys);
-    let mut left_only_keys = get_map_of_keys(diff.left_only, a, b);
-    let mut right_only_keys = get_map_of_keys(diff.right_only, b, b);
+    let mut left_only_keys = get_map_of_keys(diff.left_only, a);
+    let mut right_only_keys = get_map_of_keys(diff.right_only, b);
     let intersection_keys = diff.intersection;
 
     let mut unequal_keys = DiffTreeNode::Null;
@@ -210,7 +210,7 @@ fn process_arrays(
     Ok(Mismatch::new(left_only_nodes, right_only_nodes, diff))
 }
 
-fn get_map_of_keys(set: HashSet<String>, a: &Map<String, Value>, b: &Map<String, Value>) -> DiffTreeNode {
+fn get_map_of_keys(set: HashSet<String>, a: &Map<String, Value>) -> DiffTreeNode {
     if !set.is_empty() {
         DiffTreeNode::Node(
             set.iter()

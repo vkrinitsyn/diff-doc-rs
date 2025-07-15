@@ -11,9 +11,11 @@ use std::fmt::{Display, Formatter};
 use diffy::{create_patch, Patch};
 use crate::txt_wrapper::is_intersect_txt;
 // re-export
-pub use crate::dd::process::compare_strs;
+pub use crate::dd::process::{compare_strs, compare_json};
+pub use crate::dd::enums::DiffTreeNode;
 
 
+#[derive(Debug, PartialEq)]
 pub enum MismatchType {
     /// json documet, must start with { or [ 
     Json,
@@ -24,6 +26,7 @@ pub enum MismatchType {
     /// yaml document: better start with --- to identify as yaml
     Yaml,
 }
+
 /**
 Text file format is a https://en.wikipedia.org/wiki/Diff
 but if first line instead of standard `*** /path/to/original `
@@ -31,9 +34,14 @@ but if first line instead of standard `*** /path/to/original `
 use `*** json` OR `*** xml` OR `*** yaml` to specify document type
 
 */
+#[derive(Debug, PartialEq)]
 pub struct DocMismatch {
     pub mismatch_type: MismatchType,
     /// path to new value or to remove it
+    /// values are:
+    /// - true | false is bool
+    /// - double-quoted for string 
+    /// - otherwise considered numeric
     pub diff: HashMap<String, Option<String>>,
 }
 
@@ -83,6 +91,16 @@ impl TryFrom<String> for DocMismatch {
     fn try_from(value: String) -> Result<Self, Self::Error> {
         let mismatch_type = DocMismatch::format(&value);
         let mut diff = HashMap::new();
+        fn append(diff: &mut HashMap<String, Option<String>>, key: &String, val: &String){
+            if key.len()>0 && val.len() > 0 {
+                diff.insert(key.to_owned(),
+                    if val == "-" { // removing value
+                        None
+                    } else {
+                        Some(val[1..].to_string())
+                    });
+            }
+        }
         if let MismatchType::Text(_) = &mismatch_type {
             // diff will calculate by patch text, the patch text is required for apply
             return Ok(DocMismatch{mismatch_type, diff});
@@ -91,20 +109,15 @@ impl TryFrom<String> for DocMismatch {
         let mut key = String::new();
         let mut val = String::new();
         for l in value.split("\n").collect::<Vec<&str>>() {
-            if l.len() > 6 && &l[0..4] == "@@ "&& &l[l.len()-3..] == " @@" {
-                if lc > 0 && key.len()>0 && val.len() > 0 {
-                    diff.insert(key.to_owned(),
-                    if lc == 1 && l == "-" { // removing value
-                        None
-                    } else {
-                        Some(val[1..].to_string())
-                    });
-                }
+            if l.len() == 0 && lc == 1 {
+                continue;
+            } else if l.len() > 6 && l.starts_with("@@ ") && l.ends_with(" @@") {
+                append(&mut diff, &key, &val);
                 lc = 0;
-                key = l[4..l.len()-3].to_string();
+                key = l[3..l.len()-3].to_owned();
                 val = String::new();
-            } else {
-                if val.len() > 0 {
+            } else if key.len() > 0 {
+                if val.len() > 0 && l.len() > 0 {
                     // multiline value
                     val.push_str("\n");
                 }
@@ -112,6 +125,7 @@ impl TryFrom<String> for DocMismatch {
             }
             lc += 1;
         }
+        append(&mut diff, &key, &val);
 
         Ok(DocMismatch{mismatch_type, diff})
     }
@@ -126,7 +140,7 @@ impl DocMismatch {
     pub fn format(input: &String) -> MismatchType {
         if let Some(l) = input.find("\n") {
             let il = &input[..l];
-            if il.len() > 7 && &il[0..5] == "*** " {
+            if il.len() > 7 && il.starts_with("*** ") {
                 match &il[4..8] {
                     Self::JSON_FORMAT => { return MismatchType::Json; }
                     Self::XML_FORMAT => { return MismatchType::Xml; }
@@ -145,29 +159,57 @@ impl DocMismatch {
             }
         }
 
-        for (a, _) in &self.diff {
-            if b.is_partial_contains(a) {
+        for (a, v) in &self.diff {
+            if b.is_partial_contains(a, v.is_none())? {
                 return Ok(true);
             }
         }
-        for (b, _) in &b.diff {
-            if self.is_partial_contains(b) {
+        for (b, v) in &b.diff {
+            if self.is_partial_contains(b, v.is_none())? {
                 return Ok(true);
             }
         }
         Ok(false)
     }
 
-    pub fn is_partial_contains(&self, path: &String) -> bool {
-        if self.diff.contains_key(path) {
-            return true;
+
+    pub fn is_partial_contains(&self, path: &String, delete: bool) -> Result<bool, DocParseError> {
+        if path.ends_with("]") { // it's array element update
+            match path.rfind("[") {
+                None => Err(DocParseError::new(format!("expected array, but found {}", path))), 
+                Some(idx) => {
+                    let idx = path[idx + 1..path.len() - 2].parse::<usize>()
+                        .map_err(|e| DocParseError::new(format!("expected array numeric index, but {}", e)))?;
+                    Ok(self.diff.iter()
+                        .find(|(p, v)| if p.ends_with("]") {
+                            match p.rfind("[") {
+                                None => { false } // wrong format actually
+                                Some(pidx) => match p[pidx + 1..p.len() - 2].parse::<usize>() {
+                                    Ok(pidx) => {
+                                        if delete && v.is_none() {
+                                            idx != pidx // same delete operation is mutually overlap, unless delete same index
+                                        } else if !delete && v.is_some() {
+                                            idx == pidx  // same index update is overlap
+                                        } else if delete {
+                                            idx > pidx   // only one delete this idx, should be 
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                    Err(_) => { false } // wrong format actually
+                                   }
+                                }
+                          } else { 
+                              false 
+                          }
+                      )
+                      .is_some())
+                          // None => Ok(false), // same deletion
+              }
+          }  
+        } else {
+            Ok(self.diff.contains_key(path) || self.diff.iter().find(|(s, _)| path.starts_with(*s)).is_some()) // same key not found, but portion?)
         }
-        for (s, _) in &self.diff {
-            if path.starts_with(s) {
-                return true;
-            }
-        }
-        false
     }
     
     pub fn guess_doc_format(input: &String) -> MismatchType {

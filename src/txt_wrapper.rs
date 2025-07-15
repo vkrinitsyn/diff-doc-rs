@@ -28,7 +28,7 @@ fn irange(h: &HunkRange, diff: &mut HashSet<usize>) -> usize {
 /// - is intersected if adding / removing lines (marked uneven) less than other
 ///
 /// Returns: 
-/// - minimum number of line when adding / removing lines
+/// - minimum number of line when ok as adding / err as removing  lines
 /// - set of changing lines
 fn ranges(patch: &Patch<str>) -> (Result<usize, usize>, HashSet<usize>) {
     let mut diff = HashSet::new();
@@ -60,6 +60,7 @@ pub(crate) fn is_intersect_txt(patch_a: &String, patch_b: &String) -> Result<boo
 
 /// check for intersections i.e. unable to implement commutative for two patches
 /// use diffy::apply(base_image, &patch) to modify
+/// todo ignore same changes on same line include same line deletion
 pub fn is_intersect_patch(patch_a: &Patch<str>, patch_b: &Patch<str>) -> bool {
     let (even_a, diff_a) = ranges(patch_a);
     let (even_b, diff_b) = ranges(patch_b);

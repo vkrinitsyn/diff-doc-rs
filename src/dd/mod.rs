@@ -1,4 +1,7 @@
-//  original is https://github.com/ChrisRega/json-diff  https://github.com/ChrisRega/json-diff/blob/master/UNLICENSE
+// original is https://github.com/ChrisRega/json-diff  https://github.com/ChrisRega/json-diff/blob/master/UNLICENSE
+// fixes & changes from original:
+// 1. DiffTreeNode & DiffEntry added single Value for left-right mismatch only
+//
 
 
 pub mod enums;

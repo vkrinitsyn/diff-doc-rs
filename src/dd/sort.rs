@@ -4,6 +4,7 @@ use regex::Regex;
 use serde_json::Value;
 
 /// Returns a deep-sorted copy of the [`serde_json::Value`]
+#[cfg(test)]
 pub fn sort_value(v: &Value, ignore_keys: &[Regex]) -> Value {
     match v {
         Value::Array(a) => Value::Array(

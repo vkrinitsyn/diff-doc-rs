@@ -189,14 +189,14 @@ impl Display for PathElement<'_> {
 mod test {
     use serde_json::json;
 
-    use crate::dd::process::compare_serde_values;
+    use crate::dd::process::match_json;
     use crate::dd::sort::sort_value;
 
     #[test]
     fn test_resolve() {
         let data1 = json! {["a",{"c": ["d","f"] },"b"]};
         let data2 = json! {["b",{"c": ["e","d"] },"a"]};
-        let diffs = compare_serde_values(&data1, &data2, true, &[]).unwrap();
+        let diffs = match_json(&data1, &data2, true, &[]).unwrap();
         assert!(!diffs.is_empty());
         let data1_sorted = sort_value(&data1, &[]);
         let data2_sorted = sort_value(&data2, &[]);
