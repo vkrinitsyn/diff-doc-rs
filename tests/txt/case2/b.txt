@@ -1,0 +1,4 @@
+base text file case2
+line
+another line
+new line

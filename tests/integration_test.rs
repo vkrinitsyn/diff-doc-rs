@@ -1,4 +1,4 @@
-extern crate diff_doc;
+// extern crate diff_doc;
 mod json;
 mod txt;
 

@@ -5,7 +5,7 @@ use crate::DocMismatch;
 
 
 impl DocMismatch {
-    pub fn apply_txt(&self, input: Vec<String>) -> Vec<String> {
+    pub fn apply_patch(&self, input: Vec<String>) -> Vec<String> {
         
         input
     }

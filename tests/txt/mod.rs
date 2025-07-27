@@ -1,88 +1,38 @@
-#![allow(warnings, unused)]
-extern crate diff_doc;
+use std::fs::read_to_string;
+use serde_json::json;
+use diff_doc::{DocMismatch, MismatchType};
+const BASE: &'static str = "tests/txt";
 
-use std::cmp::{max, min};
-use std::collections::HashSet;
-use chrono::{NaiveDateTime, TimeZone, Utc};
-use diffy::{HunkRange, Patch};
-use diff_doc::*;
+fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
+    let base = read_to_string(format!("{}/case{}/base.txt", BASE, id)).unwrap();
+    let a = read_to_string(format!("{}/case{}/a.txt", BASE, id)).unwrap();
+    let b = read_to_string(format!("{}/case{}/b.txt", BASE, id)).unwrap();
+    let result = read_to_string(format!("{}/case{}/result.txt", BASE, id)).unwrap();
 
-#[tokio::test]
-async fn test_txt_diff_0() {
-    use diffy::create_patch;
-    let original = "1\n2\n3\n4\nThe Way of Kings\nWords of Radiance\n0\n1\n2\n3\n4\n5\n";
-    let modified = "1\n2\n3\n4\nThe Way of Kings\nWords of Radiance\nline3 add: Oathbringer\n0\n1\n2\n3\n4\n5\n";
-
-    let patch = create_patch(original, modified);
-    println!("{}", patch);
-    ranges(&patch);
-
-}
-#[tokio::test]
-async fn test_txt_diff_01() {
-    use diffy::create_patch;
-    let original = "1\n2\n3\nThe Way of Kings\nWords of Radiance\n0\n1\n2\n3\n4\n5\n";
-    let modified = "1\n2\n3\nThe Way of Kings\nWords of Radiance\nline3 add: Oathbringer\n0\n1\n2\n3\n4\n5\n";
-
-    let patch = create_patch(original, modified);
-    println!("{}", patch);
-    ranges(&patch);
+    let pa = DocMismatch::new(&base, &a, MismatchType::Text).unwrap();
+    println!("#{} A [{}]: {}", id, a_cnt, serde_json::to_string(&pa).unwrap());
+    let pb = DocMismatch::new(&base, &b, MismatchType::Text).unwrap();
+    println!("#{} B [{}]: {}", b_cnt, id, serde_json::to_string(&pb).unwrap());
+    assert_eq!(pa.diff.len(), a_cnt);
+    assert_eq!(pb.diff.len(), b_cnt);
+    let x = pa.is_intersect(&pb);
+    assert_eq!(x.as_ref().err().map(|e| e.to_string()).unwrap_or("".to_string()), "".to_string());
+    assert!(!x.unwrap_or(true));
+    assert_eq!(pb.apply(&pa.apply(&base).unwrap()).unwrap(), result);
+    assert_eq!(pa.apply(&pb.apply(&base).unwrap()).unwrap(), result);
 }
 
-#[tokio::test]
-async fn test_txt_diff_1() {
-    use diffy::create_patch;
-    let original = "1\n2\n3\n4\n5\nThe Way of Kings\nWords of Radiance\n00\n1\n2\n3\n4\n5\n\neof\n";
-    let modified = "1\n2\n3\n4\n5\nThe Way of Kings\nWords of Radiance - line2 change\n00\n1\n2\n3\n4\n5\n\neof\n";
-
-    let patch = create_patch(original, modified);
-    println!("{}", patch);
-    ranges(&patch);
-}
-#[tokio::test]
-async fn test_txt_diff__1() {
-    use diffy::create_patch;
-    let original = "1\n2\n3\n4\n5\nThe Way of Kings\nWords of Radiance\n00\n1\n2\n3\n4\n5\n\neof\n";
-    let modified = "1\n2\n3\n4\n5\nThe Way of Kings\n000\n1\n2\n3\n4\n5\n\neof\n";
-
-    let patch = create_patch(original, modified);
-    // patch.to_string()
-    println!("{}", patch);
-    println!("");
-    ranges(&patch);
-    // let patch = Patch::from_str(s).unwrap();
+#[test]
+fn test_case1() {
+    test_case(1, 1, 1);
 }
 
-
-
-fn irange(h: &HunkRange, diff: &mut HashSet<usize>) -> usize {
-    let range = max(h.len(), 7);
-    for i in h.start()+range / 2 .. h.end()+1-range / 2 {
-        diff.insert(i);
-    }
-    h.len()
+#[test]
+fn test_case2() {
+    test_case(2, 1, 2);
 }
 
-/// Text intersect calculation of two Patches:
-/// - not intersect if even and not same lines
-/// - is intersected if adding / removing lines (marked uneven) less than other
-///
-/// Returns: 
-/// - minimum number of line when adding / removing lines
-/// - set of changing lines
-fn ranges(patch: &Patch<str>) -> (Option<usize>, HashSet<usize>) {
-    let mut diff = HashSet::new();
-    let mut u = None;
-    for h in patch.hunks() {
-        let old = irange(&h.old_range(), &mut diff);
-        let new = irange(&h.new_range(), &mut diff);
-        if old !=new {
-            u = Some(min(old, new));
-            println!(">uneven<");
-        }
-    }
-
-    println!("{:?}\n\n", diff);
-    (u, diff)
-
+#[test]
+fn test_case3() {
+    test_case(3, 2, 3);
 }

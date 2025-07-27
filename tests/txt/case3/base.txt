@@ -1,0 +1,3 @@
+base text file case3
+line
+another line
