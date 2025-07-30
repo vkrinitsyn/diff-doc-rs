@@ -1,13 +1,33 @@
 use std::cmp::{max, min};
 use std::collections::HashSet;
-use diffy::{HunkRange, ParsePatchError, Patch};
-use crate::DocMismatch;
+use diffy::{create_patch, HunkRange, Patch};
+use crate::{DocError, MismatchDoc};
 
+/// wrapper to diffy patches with intersect calculation
+///  - Text file format as https://en.wikipedia.org/wiki/Diff
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Mismatch (String);
 
-impl DocMismatch {
-    pub fn apply_patch(&self, input: Vec<String>) -> Vec<String> {
-        
-        input
+impl MismatchDoc<String> for Mismatch {
+    fn new(base: &String, input: &String) -> Result<Self, DocError>
+    where
+        Self: Sized
+    {
+        Ok(Mismatch(create_patch(base, input).to_string()))
+    }
+
+    fn apply_to(&self, base: &String) -> Result<String, DocError> {
+        diffy::apply(base, &Patch::from_str(base.as_str())
+            .map_err(|e| DocError::new(e.to_string()))?)
+            .map_err(|e| DocError::new(e.to_string()))
+    }
+
+    fn is_intersect(&self, input: &Self) -> Result<bool, DocError> {
+        Ok(is_intersect_patch(
+            &Patch::from_str(self.0.as_str())
+            .map_err(|e| DocError::new(e.to_string()))?,
+            &Patch::from_str(input.0.as_str())
+            .map_err(|e| DocError::new(e.to_string()))?))
     }
 }
 
@@ -52,16 +72,11 @@ fn ranges(patch: &Patch<str>) -> (Result<usize, usize>, HashSet<usize>) {
     (if u { Err(min_u) } else {Ok(max_u)}, diff)
 }
 
-/// check for intersections i.e. unable to implement commutative for two patches
-pub(crate) fn is_intersect_txt(patch_a: &String, patch_b: &String) -> Result<bool, ParsePatchError> {
-    Ok(is_intersect_patch(&Patch::from_str(patch_a.as_str())?,
-                          &Patch::from_str(patch_b.as_str())?))
-}
 
 /// check for intersections i.e. unable to implement commutative for two patches
 /// use diffy::apply(base_image, &patch) to modify
 /// todo ignore same changes on same line include same line deletion
-pub fn is_intersect_patch(patch_a: &Patch<str>, patch_b: &Patch<str>) -> bool {
+fn is_intersect_patch(patch_a: &Patch<str>, patch_b: &Patch<str>) -> bool {
     let (even_a, diff_a) = ranges(patch_a);
     let (even_b, diff_b) = ranges(patch_b);
     let intersect = match even_a {

@@ -1,7 +1,7 @@
 extern crate diff_doc;
 
 use serde_json::json;
-use diff_doc::DocMismatch;
+// use diff_doc::DocMismatch;
 // use crate::diff_doc::*;
 
 #[test]
