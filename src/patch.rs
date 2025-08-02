@@ -1,12 +1,12 @@
 use std::cmp::{max, min};
 use std::collections::HashSet;
 use diffy::{create_patch, HunkRange, Patch};
-use crate::{DocError, MismatchDoc};
+use crate::{DocError, MismatchDoc, MismatchDocCow};
 
 /// wrapper to diffy patches with intersect calculation
 ///  - Text file format as https://en.wikipedia.org/wiki/Diff
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Mismatch (String);
+pub struct Mismatch (String); // Patch
 
 impl MismatchDoc<String> for Mismatch {
     fn new(base: &String, input: &String) -> Result<Self, DocError>
@@ -16,11 +16,6 @@ impl MismatchDoc<String> for Mismatch {
         Ok(Mismatch(create_patch(base, input).to_string()))
     }
 
-    fn apply_to(&self, base: &String) -> Result<String, DocError> {
-        diffy::apply(base, &Patch::from_str(base.as_str())
-            .map_err(|e| DocError::new(e.to_string()))?)
-            .map_err(|e| DocError::new(e.to_string()))
-    }
 
     fn is_intersect(&self, input: &Self) -> Result<bool, DocError> {
         Ok(is_intersect_patch(
@@ -28,6 +23,14 @@ impl MismatchDoc<String> for Mismatch {
             .map_err(|e| DocError::new(e.to_string()))?,
             &Patch::from_str(input.0.as_str())
             .map_err(|e| DocError::new(e.to_string()))?))
+    }
+}
+
+impl MismatchDocCow<String> for Mismatch {
+    fn apply(&self, base: &String) -> Result<String, DocError> {
+        diffy::apply(base, &Patch::from_str(base.as_str())
+            .map_err(|e| DocError::new(e.to_string()))?)
+            .map_err(|e| DocError::new(e.to_string()))
     }
 }
 

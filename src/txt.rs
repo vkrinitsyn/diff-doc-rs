@@ -1,7 +1,7 @@
 use std::cmp::max;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 pub(crate) use crate::{DocError};
-use crate::MismatchDoc;
+use crate::{MismatchDoc, MismatchDocCow};
 
 /// Simple text mismatch implementation with line number use as index.
 /// The empty value on amp means remove the line.
@@ -9,27 +9,8 @@ use crate::MismatchDoc;
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Mismatch (HashMap<usize, Option<String> >);
 
-
-impl MismatchDoc<String> for Mismatch {
-    fn new(base: &String, input: &String) -> Result<Self, DocError>
-    where
-        Self: Sized {
-        let mut diff = HashMap::new();
-        let base: Vec<&str> = base.split("\n").collect();
-        let a: Vec<&str> = input.split("\n").collect();
-
-        for i in 0..max(base.len(), a.len()) {
-            if i >= a.len() {
-                diff.insert(i, None); // delete line
-            } else if i >= base.len() || base[i] != a[i] { // append or change line
-                diff.insert(i, Some(a[i].to_string()));
-            }
-        }
-
-        Ok(Mismatch(diff))
-    }
-
-    fn apply_to(&self, input: &String) -> Result<String, DocError> {
+impl MismatchDocCow<String> for Mismatch {
+    fn apply(&self, input: &String) -> Result<String, DocError> {
         let mut a: Vec<&str> = input.split("\n").collect();
         let mut deletes = Vec::new();
         let mut inserts = BTreeMap::new();
@@ -65,7 +46,25 @@ impl MismatchDoc<String> for Mismatch {
         Ok(a.join("\n"))
     }
 
+}
+impl MismatchDoc<String> for Mismatch {
+    fn new(base: &String, input: &String) -> Result<Self, DocError>
+    where
+        Self: Sized {
+        let mut diff = HashMap::new();
+        let base: Vec<&str> = base.split("\n").collect();
+        let a: Vec<&str> = input.split("\n").collect();
 
+        for i in 0..max(base.len(), a.len()) {
+            if i >= a.len() {
+                diff.insert(i, None); // delete line
+            } else if i >= base.len() || base[i] != a[i] { // append or change line
+                diff.insert(i, Some(a[i].to_string()));
+            }
+        }
+
+        Ok(Mismatch(diff))
+    }
 
     fn is_intersect(&self, other: &Self) -> Result<bool, DocError> {
         let min2delete = self.min2delete();
