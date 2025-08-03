@@ -1,136 +1,47 @@
 extern crate diff_doc;
 
-use serde_json::json;
-// use diff_doc::DocMismatch;
-// use crate::diff_doc::*;
+use std::fs::read_to_string;
+use serde_json::{json, Value};
+use diff_doc::json::Mismatch;
+use diff_doc::{MismatchDoc, MismatchDocMut, Mismatches};
+const BASE: &'static str = "tests/json";
 
-#[test]
-fn test_json_diff() {
-    assert!(true);
+fn read_json(id: usize, name: &str) -> Value {
+    serde_json::from_str(read_to_string(format!("{}/case{}/{}.json", BASE, id, name)).unwrap().as_str()).unwrap()
 }
-/*
-    async fn test_json_arrays_ng2() {
-        let data1 = json!(["a", {"c": ["d","f"] }, "b"]);
-        let data2 = json!(["b", {"c": ["e","d"] }, "a"]);
-    
-        // !! todo fixme 
-    // @@ .[2] @@
-    // ~"a"
-    // @@ .[1] @@
-    // ~{"c":["e","d"]}
-    // @@ .[0] @@
-    // -
-    // fix : .[0] = ~"b"
-    // fix : .[1].c.[0] = ~"e"
-    // fix : .[1].c.[1] = ~"d"
 
-        let diffs = compare_json(&data1, &data2, &[]).unwrap();
-        assert_eq!(diffs.left_only, DiffTreeNode::Null);
-        assert_eq!(diffs.right_only, DiffTreeNode::Null);
-        assert_ne!(diffs.unequal_values, DiffTreeNode::Null);
-        let m = DocMismatch::from(diffs);
-        println!("{}", m);
+fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
+    let base = read_json(id, "base");
+    let a = read_json(id, "a");
+    let b = read_json(id, "b");
+    let result = read_json(id, "result");
 
-        // assert_eq!(m, DocMismatch::try_from(m.to_string()).unwrap());
-    
-        /*
-        println!("{}", DocMismatch::from(compare_strs(r#"["a"]"#, r#"["b"]"#, true, &[]).unwrap()));
-        println!("{}", DocMismatch::from(compare_strs("{}", r#"{"a":"1"}"#,  true, &[]).unwrap()));
-        println!("{}", DocMismatch::from(compare_strs("{\"a\":\"1\"}", "{\"b\":\"1\"}", true, &[]).unwrap()));
-        */
-    
-        // assert!(!diffs.is_empty());
-        // let diffs = diffs.unequal_values.get_diffs();
-        // 
-        // assert_eq!(diffs.len(), 1);
-        // assert_eq!(
-        //     diffs.first().unwrap().to_string(),
-        //     r#".[0].c.[1].("f" != "e")"#
-        // );
-    }
+    let pa = Mismatch::new(&base, &a).unwrap();
+    // println!("#{} A [{}]: {}", id, a_cnt, serde_json::to_string(&pa).unwrap());
+    let pb = Mismatch::new(&base, &b).unwrap();
+    // println!("#{} B [{}]: {}", b_cnt, id, serde_json::to_string(&pb).unwrap());
+    // assert_eq!(pa.diff.len(), a_cnt);
+    // assert_eq!(pb.diff.len(), b_cnt);
+    let x = pa.is_intersect(&pb);
+    assert_eq!(x.as_ref().err().map(|e| e.to_string()).unwrap_or("".to_string()), "".to_string());
+    assert!(!x.unwrap_or(true));
 
+    let mut base_a = base.clone();
+    let mut base_b = base.clone();
 
-    async fn test_json_diff_ng2() {
-        let data1 = r#"{"a":"b", "c": "df" }"#;
-        let data2 = r#"{"a":"b", "c": "ed" }"#;
-        let diffs = compare_strs(data1, data2, false, &[]);
-        let p1 = extract_path(&diffs);
-        for p in &p1 {
-            // println!("{} {}", dt, de);
-            println!("{}", p);
-        }
-        println!("second pair");
+    // Base + A + B:
+    let _ = pa.apply_mut(&mut base_a).unwrap();
+    let _ = pb.apply_mut(&mut base_a).unwrap();
+    // Base + B + A:
+    let _ = pb.apply_mut(&mut base_b).unwrap();
+    let _ = pa.apply_mut(&mut base_b).unwrap();
 
-        let data1 = r#"{"aa":{"a":"b", "c": "d" }, "bb": {"a":"b", "c": "d" }}"#;
-        let data2 = r#"{"aa":{"a":"ce", "c": "de" }, "bb": {"a":"b", "c": "d" }}"#;
-        let diffs = compare_strs(data1, data2, false, &[]);
-        let p2 = extract_path(&diffs);
-        for p in &p2 {
-            // println!("{} {}", dt, de);
-            println!("{}", p);
-        }
-        
-        println!("{} ", is_intersect(&p1, &p2));
-
-    }
-
-    #[tokio::test]
-    async fn test_json_diff_ng_i1() {
-        assert!(is_intersect(&extract_path(&compare_strs(
-            r#"{"a":"b", "c": "df" }"#,
-            r#"{"a":"b", "c": "ed" }"#, false, &[])),
-        &extract_path(&compare_strs(
-             r#"{"a":"b", "c": "df" }"#,
-             r#"{"a":"b", "c": "ex" }"#, false, &[]))
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_json_diff_ng_i2() {
-        assert!(!is_intersect(&extract_path(&compare_strs(
-            r#"{"a":"b", "c": "df" }"#,
-            r#"{"a":"b", "c": "ed" }"#, false, &[])),
-        &extract_path(&compare_strs(
-             r#"{"a":"b", "c": "df" }"#,
-             r#"{"a":"a", "c": "df" }"#, false, &[]))
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_json_diff_ng_i3() {
-        assert!(!is_intersect(&extract_path(&compare_strs(
-            r#"{"a":"b", "c": "df" }"#,
-            r#"{"a":"b" }"#, false, &[])),
-        &extract_path(&compare_strs(
-             r#"{"a":"b", "c": "df" }"#,
-             r#"{"c": "df" }"#, false, &[]))
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_json_diff_ng_i4() {
-        assert!(is_intersect(&extract_path(&compare_strs(
-            r#"{"a":"b", "c": "df" }"#,
-            r#""#, false, &[])),
-        &extract_path(&compare_strs(
-             r#"{"a":"b", "c": "df" }"#,
-             r#"{"c": "df" }"#, false, &[]))
-        ));
-    }
-
-    #[tokio::test]
-    async fn test_json_diff_ng_i5() {
-        assert!(is_intersect(&extract_path(&compare_strs(
-            r#"{"a":"b", "c": "df" }"#,
-            r#"{"a":"b" }"#, false, &[])),
-          &extract_path(&compare_strs(
-              r#"{"a":"b", "c": "df" }"#,
-              r#""#, false, &[]))
-        ));
-    }
-*/
+    assert_eq!(base_a, base_b);
+    assert_eq!(base_a, result);
+    assert_eq!(base_b, result);
+}
 
 #[test]
-fn test_it() {
-    assert!(true);
+fn test_case1() {
+    test_case(1, 1, 1);
 }

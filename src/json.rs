@@ -1,3 +1,4 @@
+use std::cmp::min;
 use std::collections::{HashMap, HashSet};
 use std::iter::repeat;
 use serde_json::{Map, Value};
@@ -187,7 +188,10 @@ impl MismatchDoc<Value> for Mismatch {
 
     fn is_intersect(&self, input: &Self) -> Result<bool, DocError> {
         for (key_a, val_a) in &self.0 {
-            if input.0.iter().find_map(|(key_b, val_b)| Some(is_intersect(key_a, val_a, key_b, val_b)))
+            if input.0.iter().find_map(|(key_b, val_b)| Some(
+                is_intersect(key_a, val_a, key_b, val_b) ||
+                is_intersect(key_b, val_b, key_a, val_a))
+            )
                 .unwrap_or(false) {
                 return Ok(true);
             }
@@ -202,9 +206,10 @@ fn is_intersect(key_a: &Vec<DocIndex>, val_a: &Option<Value>, key_b: &Vec<DocInd
     if key_a.len() == 0 || key_b.len() == 0{
         return false; // assert changes
     }
+    let comp2idx = min(key_a.len(), key_b.len())-1;
     match &key_a[key_a.len()-1] {
         DocIndex::Name(a) => {
-            match &key_b[key_b.len()-1] {
+            match &key_b[comp2idx] {
                 DocIndex::Name(b) => {
                     a==b && val_a!=val_b
                 }
@@ -214,7 +219,7 @@ fn is_intersect(key_a: &Vec<DocIndex>, val_a: &Option<Value>, key_b: &Vec<DocInd
             }
         }
         DocIndex::Idx(a) => {
-            match &key_b[key_b.len()-1] {
+            match &key_b[comp2idx] {
                 DocIndex::Name(_) => {
                     val_a.is_none() || val_b.is_none() // discrepancy in types, but in case of delete - no matter
                 }
