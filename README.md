@@ -1,6 +1,6 @@
 ## diff-doc-rs
 
-### Calculate diff on structured documents with patch file apply.
+### Calculate diff on structured documents with commutative patch apply.
 
 Create and restore diff mismatch from text or json file.
 
@@ -15,9 +15,9 @@ Base vs Document_A vs Document_B should provide Base doc with mixed change from 
 The implementation run in steps:
 1. Receive change on a Base document from host/user A and produce a Patch_A. 
 2. Receive change on a Base document from host/user B and produce a Patch_B.
-3. Compare for disjoint on Patch_A and Patch_B, so they can mutually apply in **ANY** order.
+3. Compare for disjoint on Patch_A and Patch_B, so they can mutually apply in any order.
  -  if patches intersect, then Patch_B, which goes after Patch_A will be rejected.
-4. Apply Patch_A and Patch_B on any order in any hosts to get same document.
+4. Apply Patch_A and Patch_B in **ANY** order in any hosts to get same document.
 
 Notice:
 Array deletion must not have at index less than other patch array update, neither two different index's delete.
@@ -32,5 +32,5 @@ Same apply for simplified plain text patch where line nimber use as index.
 - [ ] Yaml - todo
 
 ### TODO
-- [ ] Add idempotent like capabilities for a text patching in case of 3-way: Exclude already applied hunks from a patch about to apply. 
+- Add idempotent like capabilities for a text patching in case of 3-way: Exclude already applied hunks from a patch about to apply. 
 Modify intersections to allow same changes on a particular line.
