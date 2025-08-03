@@ -92,6 +92,10 @@ impl MismatchDoc<String> for Mismatch {
         }
         Ok(false)
     }
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl Mismatch {

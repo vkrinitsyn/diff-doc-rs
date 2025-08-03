@@ -1,5 +1,6 @@
 use std::cmp::min;
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Display, Formatter};
 use std::iter::repeat;
 use serde_json::{Map, Value};
 use crate::{DocError, MismatchDoc, MismatchDocMut};
@@ -70,6 +71,13 @@ impl MismatchDocMut<Value> for Mismatch {
 }
 
 impl  Mismatch {
+    fn zip(keys: Vec<Vec<DocIndex>>, values: Vec<Option<Value>>) -> Self {
+        let map = keys.into_iter()
+            .zip(values.into_iter())
+            .collect();
+        Mismatch(map)
+    }
+
     fn remove(&self, path: &Vec<DocIndex>, json_root: &mut Value) {
         let mut input = json_root;  // current json node pointer
         for path_index in 0..path.len() {
@@ -143,13 +151,11 @@ impl  Mismatch {
                 DocIndex::Idx(idx) => {
                     if input.is_array() {
                         let input_len = input.as_array().map(|a| a.len()).unwrap_or(0);
-                        if last_element || input_len - 1 < *idx {
-                            // build array
-                            for i in input_len - 1..idx + 1 {
-                                input.as_array_mut().unwrap().push(Value::Null);
-                            }
-                        }
-                        if last_element {
+                    // build array // if last_element || input_len - 1 < *idx {
+                    for i in input_len..*idx + 1 {
+                        input.as_array_mut().unwrap().push(Value::Null);
+                    }
+                    if last_element {
                             // set value at the end of path
                             if let Some(e) = input.get_mut(idx) {
                                 // set array element
@@ -198,6 +204,10 @@ impl MismatchDoc<Value> for Mismatch {
         }
 
         Ok(false)
+    }
+
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -257,15 +267,19 @@ fn jdiff(base: &Value, input: &Value, path: &mut Vec<DocIndex>, map: &mut HashMa
             if let Some(a) = input.as_array() {
                 for i in 0..b.len() {
                     let idx = b.len() - i -1;
-                    path.push(DocIndex::Idx(i));
                     match a.get(idx) {
                         None => {
-                            map.insert(path.to_owned(), None); // remove array element
+                            if b.get(idx).is_some() {
+                                path.push(DocIndex::Idx(idx));
+                                map.insert(path.to_owned(), None); // remove array element
+                            }
                         }
                         Some(v) => {
                             if v.is_object() && !v.is_null() {
-                                jdiff(b.get(i).unwrap(), v, path, map); // compare and insert
-                            } else {
+                                path.push(DocIndex::Idx(idx));
+                                jdiff(b.get(idx).unwrap(), v, path, map); // compare and insert
+                            } else if v != b.get(idx).unwrap_or(&Value::Null) {
+                                path.push(DocIndex::Idx(idx));
                                 map.insert(path.to_owned(), Some(v.clone()));
                             }
                         }
@@ -349,8 +363,11 @@ fn append(input: &Value, path: Vec<DocIndex>, diff: &mut HashMap<Vec<DocIndex>, 
     }
 }
 
-fn jts(input: &Value) -> Result<String, DocError> {
-    serde_json::to_string(&input).map_err(|e| DocError::new(e.to_string()))
+
+impl Display for Mismatch {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", serde_json::to_string(&self.0).unwrap_or_else(|e| format!("ERROR: {}", e)))
+    }
 }
 
 mod tests {
@@ -379,9 +396,6 @@ mod tests {
                    vec![DocIndex::Name("a".to_string()), DocIndex::Idx(1), DocIndex::Name("b".to_string())]);
     }
 
-    fn test_n() {
-        println!("{}", jts(&json!(DocIndex::new(&".a.[1].b".to_string()).unwrap())).unwrap());
-    }
 
     #[test]
     fn test_is_intersect() {
@@ -409,6 +423,27 @@ mod tests {
                              &vec![DocIndex::Name("a".into())], &None));
 
 
+    }
+
+    #[test]
+    fn test_a_0() {
+        assert_eq!(Mismatch::new(&json!(["a","b"]), &json!(["b","b"])).unwrap(),
+            Mismatch::zip(vec!(vec!(DocIndex::Idx(0))), vec!(Some(json!("b"))))
+        )
+    }
+
+    #[test]
+    fn test_a_1() {
+        assert_eq!(Mismatch::new(&json!(["a","b"]), &json!(["a","c"])).unwrap(),
+            Mismatch::zip(vec!(vec!(DocIndex::Idx(1))), vec!(Some(json!("c"))))
+        )
+    }
+
+    #[test]
+    fn test_a_2() {
+        assert_eq!(Mismatch::new(&json!(["a","b"]), &json!(["a"])).unwrap(),
+            Mismatch::zip(vec!(vec!(DocIndex::Idx(1))), vec!(None))
+        )
     }
 
 

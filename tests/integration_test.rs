@@ -1,9 +1,8 @@
-// extern crate diff_doc;
 mod json;
 mod txt;
-
+mod patch_diff;
 
 #[test]
-fn test_adding_two_numbers() {
+fn test_it() {
     assert!(true);
 }

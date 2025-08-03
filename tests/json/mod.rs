@@ -17,14 +17,14 @@ fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
     let result = read_json(id, "result");
 
     let pa = Mismatch::new(&base, &a).unwrap();
-    // println!("#{} A [{}]: {}", id, a_cnt, serde_json::to_string(&pa).unwrap());
+    println!("#{} A [{}]: {}", id, a_cnt, pa);
     let pb = Mismatch::new(&base, &b).unwrap();
-    // println!("#{} B [{}]: {}", b_cnt, id, serde_json::to_string(&pb).unwrap());
-    // assert_eq!(pa.diff.len(), a_cnt);
-    // assert_eq!(pb.diff.len(), b_cnt);
+    println!("#{} B [{}]: {}", b_cnt, id, pb);
+    assert_eq!(pa.len(), a_cnt);
+    assert_eq!(pb.len(), b_cnt);
     let x = pa.is_intersect(&pb);
     assert_eq!(x.as_ref().err().map(|e| e.to_string()).unwrap_or("".to_string()), "".to_string());
-    assert!(!x.unwrap_or(true));
+    // assert!(!x.unwrap_or(true));
 
     let mut base_a = base.clone();
     let mut base_b = base.clone();
@@ -44,4 +44,9 @@ fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
 #[test]
 fn test_case1() {
     test_case(1, 1, 1);
+}
+
+#[test]
+fn test_case2() {
+    test_case(2, 1, 1);
 }

@@ -3,12 +3,11 @@ extern crate diff_doc;
 
 use std::cmp::{max, min};
 use std::collections::HashSet;
-use chrono::{NaiveDateTime, TimeZone, Utc};
 use diffy::{HunkRange, Patch};
 use diff_doc::*;
 
-#[tokio::test]
-async fn test_txt_diff_0() {
+#[test]
+fn test_txt_diff_0() {
     use diffy::create_patch;
     let original = "1\n2\n3\n4\nThe Way of Kings\nWords of Radiance\n0\n1\n2\n3\n4\n5\n";
     let modified = "1\n2\n3\n4\nThe Way of Kings\nWords of Radiance\nline3 add: Oathbringer\n0\n1\n2\n3\n4\n5\n";
@@ -18,8 +17,9 @@ async fn test_txt_diff_0() {
     ranges(&patch);
 
 }
-#[tokio::test]
-async fn test_txt_diff_01() {
+
+#[test]
+fn test_txt_diff_01() {
     use diffy::create_patch;
     let original = "1\n2\n3\nThe Way of Kings\nWords of Radiance\n0\n1\n2\n3\n4\n5\n";
     let modified = "1\n2\n3\nThe Way of Kings\nWords of Radiance\nline3 add: Oathbringer\n0\n1\n2\n3\n4\n5\n";
@@ -29,8 +29,8 @@ async fn test_txt_diff_01() {
     ranges(&patch);
 }
 
-#[tokio::test]
-async fn test_txt_diff_1() {
+#[test]
+fn test_txt_diff_1() {
     use diffy::create_patch;
     let original = "1\n2\n3\n4\n5\nThe Way of Kings\nWords of Radiance\n00\n1\n2\n3\n4\n5\n\neof\n";
     let modified = "1\n2\n3\n4\n5\nThe Way of Kings\nWords of Radiance - line2 change\n00\n1\n2\n3\n4\n5\n\neof\n";
@@ -39,8 +39,8 @@ async fn test_txt_diff_1() {
     println!("{}", patch);
     ranges(&patch);
 }
-#[tokio::test]
-async fn test_txt_diff__1() {
+#[test]
+fn test_txt_diff__1() {
     use diffy::create_patch;
     let original = "1\n2\n3\n4\n5\nThe Way of Kings\nWords of Radiance\n00\n1\n2\n3\n4\n5\n\neof\n";
     let modified = "1\n2\n3\n4\n5\nThe Way of Kings\n000\n1\n2\n3\n4\n5\n\neof\n";

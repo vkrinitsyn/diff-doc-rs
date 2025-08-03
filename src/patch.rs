@@ -24,6 +24,10 @@ impl MismatchDoc<String> for Mismatch {
             &Patch::from_str(input.0.as_str())
             .map_err(|e| DocError::new(e.to_string()))?))
     }
+
+    fn len(&self) -> usize {
+        Patch::from_str(self.0.as_str()).map(|p| p.hunks().len()).unwrap_or(0)
+    }
 }
 
 impl MismatchDocCow<String> for Mismatch {

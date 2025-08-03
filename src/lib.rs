@@ -11,6 +11,8 @@ pub trait MismatchDoc<T> {
     fn new(base: &T, input: &T) -> Result<Self, DocError> where Self: Sized;
 
     fn is_intersect(&self, other: &Self) -> Result<bool, DocError>;
+
+    fn len(&self) -> usize;
 }
 
 /// document update as mutation
