@@ -1,13 +1,12 @@
 extern crate diff_doc;
 
 use std::fs::read_to_string;
-use serde_json::{json, Value};
+use serde_json::Value;
 use diff_doc::json::Mismatch;
-use diff_doc::{MismatchDoc, MismatchDocMut, Mismatches};
-const BASE: &'static str = "tests/json";
+use diff_doc::{MismatchDoc, MismatchDocMut};
 
 fn read_json(id: usize, name: &str) -> Value {
-    serde_json::from_str(read_to_string(format!("{}/case{}/{}.json", BASE, id, name)).unwrap().as_str()).unwrap()
+    serde_json::from_str(read_to_string(format!("tests/json/case{}/{}.json", id, name)).unwrap().as_str()).unwrap()
 }
 
 fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
@@ -23,8 +22,8 @@ fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
     assert_eq!(pa.len(), a_cnt);
     assert_eq!(pb.len(), b_cnt);
     let x = pa.is_intersect(&pb);
-    assert_eq!(x.as_ref().err().map(|e| e.to_string()).unwrap_or("".to_string()), "".to_string());
-    // assert!(!x.unwrap_or(true));
+    assert!(x.is_ok());
+    assert!(!x.unwrap(), "is_intersect");
 
     let mut base_a = base.clone();
     let mut base_b = base.clone();
@@ -41,12 +40,20 @@ fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
     assert_eq!(base_b, result);
 }
 
-#[test]
+// #[test] /// basic object update
 fn test_case1() {
     test_case(1, 1, 1);
 }
 
-#[test]
+// #[test] /// basic array update
 fn test_case2() {
     test_case(2, 1, 1);
 }
+
+#[test] /// mixed object array update
+fn test_case3() {
+    test_case(3, 2, 1);
+}
+
+
+

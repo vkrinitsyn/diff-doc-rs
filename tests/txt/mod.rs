@@ -1,5 +1,4 @@
 use std::fs::read_to_string;
-use serde_json::json;
 use diff_doc::*;
 use diff_doc::txt::Mismatch;
 const BASE: &'static str = "tests/txt";
@@ -14,8 +13,8 @@ fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
     println!("#{} A [{}]: {}", id, a_cnt, serde_json::to_string(&pa).unwrap());
     let pb = Mismatch::new(&base, &b).unwrap();
     println!("#{} B [{}]: {}", b_cnt, id, serde_json::to_string(&pb).unwrap());
-    // assert_eq!(pa.diff.len(), a_cnt);
-    // assert_eq!(pb.diff.len(), b_cnt);
+    assert_eq!(pa.len(), a_cnt);
+    assert_eq!(pb.len(), b_cnt);
     let x = pa.is_intersect(&pb);
     assert_eq!(x.as_ref().err().map(|e| e.to_string()).unwrap_or("".to_string()), "".to_string());
     assert!(!x.unwrap_or(true));

@@ -67,6 +67,7 @@ impl Display for Mismatches {
     }
 }
 
+#[cfg(test)]
 mod tests {
     #[test]
     fn test_compile() {

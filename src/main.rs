@@ -1,16 +1,22 @@
+use serde_json::json;
+use diff_doc::*;
+use diff_doc::json::Mismatch;
+
 /**
 usage examples
 
 */
 
-// #[tokio::main(flavor = "multi_thread", worker_threads = 10)]
 fn main() {
-    println!("ok");
+    let m = Mismatch::new( &json!({"a":["b","c"], "d":["e","f"]}),
+                              &json!({"a":["b","c"], "d":["e","g"]})).unwrap();
+    println!("{}", m);
+
 }
 
 
+#[cfg(test)]
 mod tests {
-    // #[tokio::test]
     #[test]
     fn test_compile() {
         assert!(true);

@@ -1,5 +1,5 @@
 use std::cmp::max;
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap};
 pub(crate) use crate::{DocError};
 use crate::{MismatchDoc, MismatchDocCow};
 
