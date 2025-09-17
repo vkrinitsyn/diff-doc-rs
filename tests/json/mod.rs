@@ -22,7 +22,7 @@ fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
     assert_eq!(pa.len(), a_cnt);
     assert_eq!(pb.len(), b_cnt);
     let x = pa.is_intersect(&pb);
-    assert!(x.is_ok());
+    assert!(x.is_ok(), "is_intersect parsing");
     assert!(!x.unwrap(), "is_intersect");
 
     let mut base_a = base.clone();
@@ -40,12 +40,12 @@ fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
     assert_eq!(base_b, result);
 }
 
-// #[test] /// basic object update
+#[test] /// basic object update
 fn test_case1() {
     test_case(1, 1, 1);
 }
 
-// #[test] /// basic array update
+#[test] /// basic array update
 fn test_case2() {
     test_case(2, 1, 1);
 }

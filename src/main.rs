@@ -1,6 +1,6 @@
 use serde_json::json;
 use diff_doc::*;
-use diff_doc::json::Mismatch;
+use diff_doc::diff::Mismatch;
 
 /**
 usage examples
@@ -8,9 +8,9 @@ usage examples
 */
 
 fn main() {
-    let m = Mismatch::new( &json!({"a":["b","c"], "d":["e","f"]}),
-                              &json!({"a":["b","c"], "d":["e","g"]})).unwrap();
-    println!("{}", m);
+    // let m = Mismatch::new( &json!({"a":["b","c"], "d":["e","f"]}),
+    //                           &json!({"a":["b","c"], "d":["e","g"]})).unwrap();
+    // println!("{}", m);
 
 }
 

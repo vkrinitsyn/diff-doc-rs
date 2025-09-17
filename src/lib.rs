@@ -1,6 +1,10 @@
 pub mod patch;
 pub mod txt;
-pub mod json;
+// pub mod json;
+pub mod diff;
+mod generic;
+mod vec_processor;
+mod map_processor;
 
 use std::borrow::Cow;
 use std::fmt;
@@ -17,7 +21,10 @@ pub trait MismatchDoc<T> {
 
 /// document update as mutation
 pub trait MismatchDocMut<T> {
-    fn apply_mut(&self, input: &mut T) -> Result<(), DocError>;
+    
+    /// if fail_fast then stop on first error, 
+    /// otherwise try to apply all and collect errors on Ok response 
+    fn apply_mut(&self, input: &mut T, fail_fast: bool) -> Result<Vec<DocError>, DocError>;
 }
 
 /// document update Copy on Write
@@ -28,16 +35,12 @@ pub trait MismatchDocCow<T> {
 /// supported type of document
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Mismatches {
-    /// with initial diff patch content
+    /// with initial diff patch content from GNU patch file
     Patch(patch::Mismatch),
-    /// json document
-    Json(json::Mismatch),
+    /// json or other document
+    Doc(diff::Mismatch),
     /// line number strings update and trim only
     Text(txt::Mismatch),
-    // Xml document  todo define xml document portion value
-    // Xml(HashMap<String, Option<String>>),
-    // yaml document todo define yaml document portion value
-    // Yaml(HashMap<String, Option<String>>),
 }
 
 

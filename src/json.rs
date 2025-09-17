@@ -1,5 +1,7 @@
 use std::cmp::min;
+use std::collections::{HashMap, HashSet};
 use std::fmt::{Display, Formatter};
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::iter::repeat;
 use serde_json::Value;
 use crate::{DocError, MismatchDoc, MismatchDocMut};
@@ -18,11 +20,57 @@ pub struct Hunk {
     value: Option<Value>,
 }
 
+impl Display for Hunk {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", serde_json::to_string(&self).unwrap_or_else(|e| format!("ERROR: {}", e)))
+    }
+}
 
-fn append_insert(v: &mut Vec<Hunk>, path: &Vec<DocIndex>, append: usize, value: Option<&Value>) {
-    let mut path = path.to_owned();
-    path.push(DocIndex::Idx(append));
-    v.push(Hunk{path, value: value.map(|v| v.to_owned())})
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// value of changes
+pub enum HunkVo {
+    /// remove
+    Remove,
+    /// change value
+    Value(Value),
+    /// change array index with shift right
+    Reindex(usize),
+    /// obj name
+    Rename(String),
+}
+
+#[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+/// chunk of changes
+pub struct Hunk2 {
+    /// json path
+    #[serde(rename ="p")]
+    pub(crate) path: Vec<DocIndex>,
+    /// None for remove at path specified
+    #[serde(rename ="v")]
+    pub(crate) value: HunkVo,
+}
+
+impl Hunk {
+    fn new_rm(path: &Vec<DocIndex>) -> Self {
+        Hunk{path: path.clone(), value: None}
+    }
+
+    fn new_v(path: &Vec<DocIndex>, v: &Value) -> Self {
+        Hunk{path: path.clone(), value: Some(v.to_owned())}
+    }
+
+    fn new_a(path: &Vec<DocIndex>, append: usize, value: Option<&Value>) -> Self {
+        let mut path = path.to_owned();
+        path.push(DocIndex::Idx(append));
+        Hunk{path, value: value.map(|v| v.to_owned())}
+    }
+
+    fn is_none(&self) -> bool {
+        match &self.value {
+            None => true,
+            Some(_) => false
+        }
+    }
 }
 
 
@@ -202,16 +250,13 @@ impl MismatchDoc<Value> for Mismatch {
     where
         Self: Sized
     {
-        let mut diff = Vec::new();
-        jdiff(base, &input, &mut vec![], &mut diff);
-        Ok(Mismatch(diff))
+        Ok(Mismatch(jdiff(base, &input, &vec![])))
     }
 
     fn is_intersect(&self, input: &Self) -> Result<bool, DocError> {
         for a in &self.0 {
             if input.0.iter().find_map(|b| Some( is_intersect(a, b) || is_intersect(b, a) ))
                 .unwrap_or(false) {
-                println!("OK is_intersect {a:?} ");
                 return Ok(true);
             }
         }
@@ -226,15 +271,16 @@ impl MismatchDoc<Value> for Mismatch {
 
 /// check for intersection of two patches by path for update or delete of documents including vec/array
 fn is_intersect(a: &Hunk, b: &Hunk) -> bool {
-    if a.path.len() == 0 || b.path.len() == 0{
+    if a.path.len() == 0 || b.path.len() == 0 {
         return false; // assert changes
     }
-    
+
+    // this is a json path index, the longer path wont intersect with short one if longer do not contain the short
     let comp2idx = min(a.path.len(), b.path.len());
 
     for i in 0..comp2idx {
         if let Some(cause) = is_intersect2(a,b,i, !(a.path.len()==b.path.len() && i==comp2idx)) {
-            #[cfg(debug_assertions)] println!("is_intersect as step {i} of {comp2idx} by {cause}");
+            #[cfg(debug_assertions)] println!("is_intersect as step {i} of {comp2idx} by: {cause}\n{a}\n{b}");
         } else {
             return false;
         }
@@ -270,13 +316,9 @@ fn is_intersect2(a: &Hunk, b: &Hunk, idx: usize, ignore_val: bool) -> Option<&'s
                     match &a.value {
                         None => {
                             match &b.value {
-                                None => {
-                                    if !ignore_val {
-                                        Some("remove both - undefined second remove index after first remove & shift")
-                                    } else { None }
-                                }
+                                None => Some("remove both - undefined second remove index after first remove & shift"),
                                 Some(_) => {
-                                    if !ignore_val && a_idx > b_idx {
+                                    if  !ignore_val && a_idx > b_idx {
                                         Some("update b, remove a")
                                     } else { None }
                                 }
@@ -305,83 +347,167 @@ fn is_intersect2(a: &Hunk, b: &Hunk, idx: usize, ignore_val: bool) -> Option<&'s
 
 /// traverse to all json tree and clean the input intersect with base, so remining input will be added to discrepancy
 /// return the tree is empty
-fn jdiff(base: &Value, input: &Value, path: &Vec<DocIndex>, map: &mut Vec<Hunk>) {
+fn jdiff(base: &Value, input: &Value, path: &Vec<DocIndex>) -> Vec<Hunk> {
     if base.is_null() && !input.is_null() {
-        map.push(Hunk{path: path.to_owned(), value: Some(input.to_owned())});
+        vec![Hunk::new_v(path, input)]
     } else if !base.is_null() && input.is_null() {
-        map.push(Hunk{path: path.to_owned(), value: None});
+        vec![Hunk::new_rm(path)]
     } else if base.is_array() {
+        let mut diff = Vec::new();
         if let Some(base_arr) = base.as_array() {
             if let Some(input_arr) = input.as_array() {
                 if base_arr.len() == 0 {   // append all
-                    map.push(Hunk{path: path.to_owned(), value: Some(input.to_owned())});
+                    diff.push(Hunk::new_v(path, input));
                 }
+                // todo rewrite to support insert - use identify_min_vec_changes
                 if input_arr.len() > base_arr.len() {
                     for i in base_arr.len()..input_arr.len() {
-                        append_insert(map, path, i, input_arr.get(i));
+                        diff.push(Hunk::new_a(path, i, input_arr.get(i)));
                     }
                 }
-
-                for i in identify_min_changes(base_arr, input_arr, path, map)..base_arr.len() {
-                    let idx = base_arr.len() - i - 1;
-                    match input_arr.get(idx) {
-                        None => {
-                            if base_arr.get(idx).is_some() {
-                                append_insert(map, path, idx, None); // remove array element
+                // if input_arr.len() < base_arr.len() {
+                let mut d = identify_min_vec_changes(base_arr, input_arr, path);
+                if d.len() > 0 {
+                    diff.append(&mut d);
+                } else {
+                    // todo move for loop into identify_min_vec_changes
+                    for i in 0..base_arr.len() {
+                        let idx = base_arr.len() - i - 1;
+                        match input_arr.get(idx) {
+                            None => {
+                                if base_arr.get(idx).is_some() {
+                                    diff.push(Hunk::new_a(path, idx, None)); // remove array element
+                                }
                             }
-                        }
-                        Some(v) => {
-                            if v.is_object() && !v.is_null() {
-                                let mut path = path.to_owned();
-                                path.push(DocIndex::Idx(idx));
-                                jdiff(base_arr.get(idx).unwrap(), v, &path, map); // compare and insert
-                            } else if v != base_arr.get(idx).unwrap_or(&Value::Null) {
-                                append_insert(map, path, idx, Some(v));
+                            Some(v) => {
+                                if v.is_object() && !v.is_null() {
+                                    let mut path = path.to_owned();
+                                    path.push(DocIndex::Idx(idx));
+                                    diff.append(&mut jdiff(base_arr.get(idx).unwrap(), v, &path)); // compare and insert
+                                } else if v != base_arr.get(idx).unwrap_or(&Value::Null) {
+                                    diff.push(Hunk::new_a(path, idx, Some(v)));
+                                }
                             }
                         }
                     }
                 }
-
             } else { // unmatch types - the new value is not arrays
-                map.push(Hunk{path: path.to_owned(), value: Some(input.to_owned())});
+                diff.push(Hunk::new_v(path, input));
             }
         }
+        diff
     } else if base.is_object() {
+        let mut diff = Vec::new();
         if let Some(b) = base.as_object() {
             if let Some(input) = input.as_object() {
                 for (key, val) in b {
                     let mut p = path.clone();
                     p.push(DocIndex::Name(key.clone()));
                     if let Some(input) = input.get(key) {
-                        jdiff(val, input, &mut p, map);
+                        diff.append(&mut jdiff(val, input, &p));
                     } else {
-                        map.push(Hunk{path: p.to_owned(), value: None});
+                        diff.push(Hunk::new_rm(path));
                     }
                 }
 
                 if b.len() < input.len() {
                     for (key, input) in input.iter()
                         .filter(|(k, _)| !b.contains_key(*k)) {
-                        append(input, &path, DocIndex::Name(key.clone()), map);
+                        append(input, &path, DocIndex::Name(key.clone()), &mut diff);
                     }
                 }
             } else { // unmatch types - the new value is not object
-                map.push(Hunk{path: path.to_owned(), value: Some(input.to_owned())});
+                diff.push(Hunk::new_v(path, input));
             }
         }
+        diff
     // object elements not null, objects nor array, present in this, may or may not be equal to input, so remove from input anyway
     } else if base != input {
-        map.push(Hunk{path: path.to_owned(), value: if input.is_null() { None } else { Some(input.to_owned()) }});
+        vec![Hunk{path: path.to_owned(), value: if input.is_null() { None } else { Some(input.to_owned()) }}]
+    } else {
+        vec![]
     }
 }
 
 /// Heuristic search to remove some index from base
 /// return 0 or input_arr.len() if input_arr.len() < base_arr.len()
-fn identify_min_changes(base_arr: &Vec<Value>, input_arr: &Vec<Value>, path: &Vec<DocIndex>, diff: &mut Vec<Hunk>) -> usize {
-    if input_arr.len() < base_arr.len() {
-       // todo
+
+fn identify_min_vec_changes(base_arr: &Vec<Value>, input_arr: &Vec<Value>, path: &Vec<DocIndex>) -> Vec<Hunk> {
+    let mut diff = Vec::new();
+
+    let mut map = HashSet::with_capacity(input_arr.len());
+    for v in input_arr {
+        map.insert(hs(v));
     }
-    0
+    #[cfg(debug_assertions)] println!("\n{:?}\n", map);
+    let mut idx = 0;
+    for v in base_arr {
+        if !map.contains(&hs(v)) {
+            diff.push(Hunk::new_a(path, idx, None));
+        }
+        idx +=1;
+    }
+    diff
+}
+
+/// Heuristic search to remove some index from base
+/// return 0 or input_arr.len() if input_arr.len() < base_arr.len()
+// todo:
+//  1. array element move from index to index
+//  2. array element delete
+//  3. array object minimal changes
+fn identify_min_vec_changes2(base_arr: &Vec<Value>, input_arr: &Vec<Value>, path: &Vec<DocIndex>) -> Vec<Hunk2> {
+
+    let mut diff = Vec::new();
+    let mut map = HashMap::with_capacity(input_arr.len());
+    let mut idx = 0;
+    for v in input_arr {
+        map.insert(hs(v), idx);
+        idx +=1;
+    }
+    #[cfg(debug_assertions)] println!("\n{:?}\n", map);
+    for i in 0..base_arr.len() {
+        let idx = base_arr.len() - i;
+        if !map.contains_key(&hs(&base_arr[idx])) {
+            let mut path = path.clone();
+            path.push(DocIndex::Idx(idx));
+            diff.push(Hunk2{ path, value: HunkVo::Remove });
+        }
+    }
+    diff
+    /*
+        for i in 0..base_arr.len() {
+            let idx = base_arr.len() - i - 1;
+            match input_arr.get(idx) {
+                None => {
+                    if base_arr.get(idx).is_some() {
+                        append_insert(map, path, idx, None); // remove array element
+                    }
+                }
+                Some(v) => {
+                    if v.is_object() && !v.is_null() {
+                        let mut path = path.to_owned();
+                        path.push(DocIndex::Idx(idx));
+                        jdiff(base_arr.get(idx).unwrap(), v, &path, map); // compare and insert
+                    } else if v != base_arr.get(idx).unwrap_or(&Value::Null) {
+                        append_insert(map, path, idx, Some(v));
+                    }
+                }
+            }
+        }
+   */
+    // } else {
+    //     0
+    // }
+}
+
+fn hs(input: &Value) -> u64 {
+    // let input = serde_json::to_string(input).expect("Failed to serialize JSON");
+    let mut hasher = DefaultHasher::new();
+    input.hash(&mut hasher);
+    let h = hasher.finish();
+    #[cfg(debug_assertions)] println!("{input} = {h}");
+    h
 }
 
 /// check remines on input object. extract all object if single field or element array
@@ -398,7 +524,7 @@ fn append(input: &Value, path: &Vec<DocIndex>, path_append: DocIndex, diff: &mut
                     append(a, &path, DocIndex::Idx(0), diff); // recursion with a new path
                 }
             } else {
-                diff.push(Hunk{path: path.to_owned(), value: Some(input.to_owned())});
+                diff.push(Hunk::new_v(&path, input));
             }
         }
         Value::Object(i) => {
@@ -407,11 +533,11 @@ fn append(input: &Value, path: &Vec<DocIndex>, path_append: DocIndex, diff: &mut
                     append(v, &path, DocIndex::Name(k.clone()), diff); // recursion with a new path
                 }
             } else {
-                diff.push(Hunk{path: path.to_owned(), value: Some(input.to_owned())});
+                diff.push(Hunk::new_v(&path, input));
             }
         }
         _ => {
-            diff.push(Hunk{path: path.to_owned(), value: Some(input.to_owned())});
+            diff.push(Hunk::new_v(&path, input));
         }
     }
 }
@@ -462,6 +588,21 @@ mod tests {
    }
 
     #[test]
+    fn test_h_1() {
+        assert_eq!(Mismatch::new(&json!(["a", "b", "c"]), &json!(["b", "c"])).unwrap(),
+                   Mismatch(vec![Hunk{path: vec![DocIndex::Idx(0)], value: None}] )
+        );
+
+        assert_eq!(Mismatch::new(&json!(["a", "b", "c"]), &json!(["a", "c"])).unwrap(),
+                   Mismatch(vec![Hunk{path: vec![DocIndex::Idx(1)], value: None}] )
+        );
+
+        assert_eq!(Mismatch::new(&json!(["a", "b", "c"]), &json!(["a", "b"])).unwrap(),
+                   Mismatch(vec![Hunk{path: vec![DocIndex::Idx(2)], value: None}] )
+        );
+    }
+
+    #[test]
     fn test_ia_del0() {
         assert!(is_intersect(&Hunk{path: vec![DocIndex::Idx(0)], value: None},
                               &Hunk{path: vec![DocIndex::Idx(1)], value: None}));
@@ -508,26 +649,10 @@ mod tests {
         )
     }
 
-    // #[test]
-    fn test_a_() { // test middle remove
-        assert_eq!(Mismatch::new(&json!(["a","b","c"]), &json!(["a","c"])).unwrap(),
-            Mismatch(vec![Hunk{path: vec![DocIndex::Idx(0)], value: None},
-                          Hunk{path: vec![DocIndex::Idx(1)], value: Some(json!("c"))}
-            ] )
-        )
-    }
-
     #[test]
-    fn test_a_3() {
+    fn test_a_4() {
         assert_eq!(Mismatch::new(&json!(["a","b"]), &json!(["c", "b"])).unwrap(),
             Mismatch(vec![Hunk{path: vec![DocIndex::Idx(0)], value: Some(json!("c"))}] )
-        )
-    }
-
-    // #[test]
-    fn test_a_4() { // todo remove with shift?
-        assert_eq!(Mismatch::new(&json!(["a","b", "c"]), &json!(["a", "c"])).unwrap(),
-            Mismatch(vec![Hunk{path: vec![DocIndex::Idx(1)], value: None}] )
         )
     }
 
