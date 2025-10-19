@@ -1,6 +1,6 @@
-// mod json;
+mod json;
 mod txt;
-mod patch_diff;
+#[cfg(feature="patch")] mod patch_diff;
 
 #[test]
 fn test_it() {

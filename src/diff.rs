@@ -1,7 +1,7 @@
 use std::cmp::{max, min};
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hash, Hasher};
-use serde::{Deserialize, Deserializer, Serialize};
+use std::hash::{Hash, Hasher};
+use serde::{Deserialize, Serialize};
 use crate::{txt, DocError, MismatchDoc, MismatchDocCow, MismatchDocMut};
 
 use crate::generic::{DocIndex, GenericValue, Hunk, HunkAction};
@@ -288,11 +288,13 @@ fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapTy
 /// check for intersection of two patches by path for update or delete of documents including vec/array
 fn is_intersect2(a: &Hunk, b: &Hunk, idx: usize, ignore_val: bool, ranges_b: &PathMapType) -> Option<&'static str> {
     // check a in ranges_b
-    if let DocIndex::Idx(idx) = a.path[a.path.len()-1] {
-        if let Some(ps) = ranges_b.get(&PathKey(a.path[..max(a.path.len()-2, 0)].to_vec())) {
-            for p in ps {
-                if p.range.start < idx && p.range.end.unwrap_or(usize::MAX) > idx {
-                    return Some("overlap in ranges");
+    if a.path.len() > 2 {
+        if let DocIndex::Idx(idx) = a.path[a.path.len() - 1] {
+            if let Some(ps) = ranges_b.get(&PathKey(a.path[..max(a.path.len() - 2, 0)].to_vec())) {
+                for p in ps {
+                    if p.range.start < idx && p.range.end.unwrap_or(usize::MAX) > idx {
+                        return Some("overlap in ranges");
+                    }
                 }
             }
         }

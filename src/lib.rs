@@ -1,8 +1,7 @@
-pub mod patch;
+#[cfg(feature="patch")] pub mod patch;
 pub mod txt;
-// pub mod json;
 pub mod diff;
-mod generic;
+pub mod generic;
 mod vec_processor;
 mod map_processor;
 
@@ -35,6 +34,7 @@ pub trait MismatchDocCow<T> {
 /// supported type of document
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Mismatches {
+    #[cfg(feature="patch")]
     /// with initial diff patch content from GNU patch file
     Patch(patch::Mismatch),
     /// json or other document

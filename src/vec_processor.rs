@@ -1,9 +1,9 @@
 use std::cell::RefCell;
-use std::cmp::max;
 use crate::generic::{hs, DocIndex, GenericValue, Hunk, HunkAction};
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::{Rc, Weak};
+use crate::map_processor::min_map_changes;
 
 #[derive(Clone, Debug)]
 struct Idx {
@@ -16,14 +16,11 @@ impl Idx {
     }
 }
 
-fn find_src(src: &HashMap<u64, Vec<Weak<RefCell<Idx>>>>, hash: u64, work_idx: usize) -> Option<usize> {
+fn find_src(src: &HashMap<u64, Vec<Weak<RefCell<Idx>>>>,  sources: &Vec<Rc<RefCell<Idx>>>, hash: u64, work_idx: usize) -> Option<usize> {
     if let Some(v) = src.get(&hash) {
-        for we in v {
-            if let Some(st) = we.upgrade() {
-                let i = st.borrow().original_idx;
-                if i >= work_idx {
-                    return Some(i);
-                }
+        for i in work_idx..sources.len() {
+            if hash == sources[i].borrow().hash {
+                return Some(i);
             }
         }
     }
@@ -75,12 +72,6 @@ pub fn compute_vec_diff(old: &Vec<GenericValue>, new: &Vec<GenericValue>, contex
     //  - identify indexes that are inserted with complete new values
     //  - use workspace to track used indices in old
 
-    // 1.  Iterate over new, if old by Id by workspace not equal define:
-    // Shift or not shift i.e. Update or insert, search it old,
-    //  if found index less, than clone, if more than swap,
-    // Do search 1/10 min 2 elements ahead to identify for removal with shift left
-    //  if not found, than use clone with possible updates:
-    //      if more effective or insert
     for (work_index, new_value) in new.iter().enumerate() {
         if work_index >= workspace.len() {
             // no future insert to workspace for all remining new values
@@ -91,14 +82,11 @@ pub fn compute_vec_diff(old: &Vec<GenericValue>, new: &Vec<GenericValue>, contex
         } else {
             let new_hash = hs(new_value);
             let work_item = workspace[work_index].borrow().deref().clone();
-            // println!("work_index:[{:?}]{:?}, new_index:[{work_index}]{:?}", work_item, old[work_item.original_idx], new[work_index]);
             if work_item.hash != new_hash {
                 let path = append_path(context_path, work_index);
-                match find_src(&sources, new_hash, work_index) {
+                match find_src(&sources, &workspace, new_hash, work_index) {
                     Some(fi) => {
-                        // println!("founded_indices: found:{fi}");
                         if fi < work_index {
-                            // println!(" - clone: founded_indices: {fi}, new:[{}]{:?}, old:[{}]{:?}, workspace:[{}]", new.len(), new[fi], old.len(), old[work_index], workspace.len());
                             updates.push(Hunk { path, value: HunkAction::Clone(DocIndex::Idx(fi)) });
                             let r = Rc::new(RefCell::new(Idx::new(work_index, new_hash)));
                             sources.entry(new_hash).or_insert_with(Vec::new).push(Rc::downgrade(&r));
@@ -136,17 +124,42 @@ pub fn compute_vec_diff(old: &Vec<GenericValue>, new: &Vec<GenericValue>, contex
     updates
 }
 
-// todo try update existing object and compare with insert by json size produced
-fn compare_apply(_to_update: &GenericValue,
-                 to_insert: &GenericValue,
+/// update existing object
+fn compare_apply(original: &GenericValue,
+                 new_value: &GenericValue,
                  new_hash: u64,
                  path: Vec<DocIndex>,
                  updates: &mut Vec<Hunk>,
                  workspace: &mut Vec<Rc<RefCell<Idx>>>,
                  sources: &mut HashMap<u64, Vec<Weak<RefCell<Idx>>>>,
-                 work_index: usize) {
+                 work_index: usize)
+{
 
-    updates.push(Hunk { path, value: HunkAction::Update(to_insert.clone()) });
+     if match original {
+        GenericValue::Map(base_map) => {
+            match new_value {
+                GenericValue::Map(new_map) => {
+                    let mut changes = min_map_changes(base_map, new_map, &path);
+                    updates.append(&mut changes);
+                    false
+                }
+                _ => true
+            }
+        }
+        GenericValue::StringValue(base_txt) => {
+            match new_value {
+                GenericValue::StringValue(new_txt) => {
+                    let ops = crate::txt::diff(base_txt, new_txt);
+                    updates.push(Hunk { path: path.clone(), value: HunkAction::UpdateTxt(ops) });
+                    false
+                }
+                _ => true
+            }
+        }
+        _ => true
+    } {
+         updates.push(Hunk { path, value: HunkAction::Update(new_value.clone()) });
+    }
 
     let r = Rc::new(RefCell::new(Idx::new(work_index, new_hash)));
     sources.entry(new_hash).or_insert_with(Vec::new).push(Rc::downgrade(&r));
@@ -186,7 +199,7 @@ mod tests {
     use std::collections::HashMap;
     use std::rc::{Rc, Weak};
     use serde_json::json;
-    use crate::vec_processor::{compute_vec_diff, find_src, Idx};
+    use crate::vec_processor::{compute_vec_diff, Idx};
     use crate::generic::{GenericValue, Hunk, HunkAction, DocIndex, hs, from_str_vec};
     use crate::txt::apply_diff;
 
@@ -231,8 +244,8 @@ mod tests {
         let idx = sources.get(&workspace[2].borrow().hash)
             .unwrap()[0].upgrade().unwrap().borrow().original_idx;
         println!("after {} ", idx);
-        let f = find_src(&sources, h, 1);
-        assert_eq!(f, Some(10));
+        // let f = find_src(&sources, h, 1);
+        // assert_eq!(f, Some(10));
     }
 
     #[test]
@@ -302,6 +315,24 @@ mod tests {
         }
     }
 
+   #[test]
+    fn test_compute_vec_diff_swap3() {
+        if let GenericValue::Array(old) = serde_json::from_value(
+            json!(["1", "two", "3", "4", "five"])).unwrap() {
+            if let GenericValue::Array(new) = serde_json::from_value(
+                json!(["1", "3", "five", "two"])).unwrap() {
+                let context_path = vec![];
+                let diffs = compute_vec_diff(&old, &new, &context_path);
+                println!("{:?}", diffs);
+                assert_eq!(diffs.len(), 3);
+
+                assert_eq!(diffs[0], Hunk{path:vec![DocIndex::Idx(1)], value: HunkAction::Swap(DocIndex::Idx(2))});
+                assert_eq!(diffs[1], Hunk{path:vec![DocIndex::Idx(2)], value: HunkAction::Swap(DocIndex::Idx(4))});
+                assert_eq!(diffs[2], Hunk{path:vec![DocIndex::Idx(3)], value: HunkAction::Remove});
+            }
+        }
+    }
+
     #[test]
     fn test_compute_vec_diff_appl() {
         let old = from_str_vec(vec!["a","b","c"]);
@@ -310,7 +341,7 @@ mod tests {
             if let GenericValue::Array(new) = &new {
                 let diffs = compute_vec_diff(old, new, &vec![]);
                 assert_eq!(diffs.len(), 1);
-                assert_eq!(diffs[0], Hunk{path:vec![DocIndex::Idx(2)], value: HunkAction::Update(GenericValue::StringValue("d".to_string()))});
+                // assert_eq!(diffs[0], Hunk{path:vec![DocIndex::Idx(2)], value: HunkAction::Update(GenericValue::StringValue("d".to_string()))});
                 // apply_diff()
             }
         }

@@ -1,13 +1,9 @@
-use std::cmp::min;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::hash::{DefaultHasher, Hash, Hasher};
-use std::iter::repeat;
 use serde::{Deserialize, Deserializer, Serialize};
-use toml::value::Index;
-use crate::{DocError, MismatchDoc, MismatchDocMut};
 use crate::map_processor::min_map_changes;
-use crate::txt::{compute_diff, DiffOp};
+use crate::txt::DiffOp;
 use crate::vec_processor::compute_vec_diff;
 
 #[derive(Clone, Serialize, Deserialize, Debug,  PartialEq, Eq)]
@@ -217,6 +213,10 @@ impl GenericValue {
 }
 
 // --- Parsing Functions ---
+pub fn from_str_vec(s: Vec<&str>) -> GenericValue {
+    GenericValue::Array(s.into_iter().map(|v| GenericValue::StringValue(v.to_string())).collect())
+}
+
 pub fn from_json(s: &str) -> Result<GenericValue, serde_json::Error> {
     serde_json::from_str(s)
 }

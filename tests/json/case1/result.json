@@ -1,5 +1,5 @@
 {
+  "another": "changed",
   "base": "json file case1",
-  "line": "changed",
-  "another": "changed"
+  "line": "changed"
 }

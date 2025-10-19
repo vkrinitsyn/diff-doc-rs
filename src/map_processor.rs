@@ -1,9 +1,4 @@
-use std::cmp::min;
 use std::collections::{HashMap, HashSet};
-use std::fmt::{Display, Formatter};
-use std::hash::{DefaultHasher, Hash, Hasher};
-use serde::{Deserialize, Deserializer, Serialize};
-use crate::{DocError, MismatchDoc, MismatchDocMut};
 use crate::generic::*;
 
 /// identify min_map_changes
@@ -35,10 +30,3 @@ pub(crate) fn min_map_changes(base_map: &HashMap<String, GenericValue>, input_ma
         diff
     }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parsing_test_1() {}
-}

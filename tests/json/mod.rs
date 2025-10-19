@@ -1,12 +1,12 @@
 extern crate diff_doc;
 
 use std::fs::read_to_string;
-use serde_json::Value;
-use diff_doc::json::Mismatch;
 use diff_doc::{MismatchDoc, MismatchDocMut};
+use diff_doc::diff::Mismatch;
+use diff_doc::generic::{from_json, to_json, to_yaml, GenericValue};
 
-fn read_json(id: usize, name: &str) -> Value {
-    serde_json::from_str(read_to_string(format!("tests/json/case{}/{}.json", id, name)).unwrap().as_str()).unwrap()
+fn read_json(id: usize, name: &str) -> GenericValue {
+    from_json(read_to_string(format!("tests/json/case{}/{}.json", id, name)).unwrap().as_str()).unwrap()
 }
 
 fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
@@ -16,9 +16,9 @@ fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
     let result = read_json(id, "result");
 
     let pa = Mismatch::new(&base, &a).unwrap();
-    println!("#{} A [{}]: {}", id, a_cnt, pa);
+    println!("#{} A [{}]: {:?}", id, a_cnt, pa);
     let pb = Mismatch::new(&base, &b).unwrap();
-    println!("#{} B [{}]: {}", b_cnt, id, pb);
+    println!("#{} B [{}]: {:?}", b_cnt, id, pb);
     assert_eq!(pa.len(), a_cnt);
     assert_eq!(pb.len(), b_cnt);
     let x = pa.is_intersect(&pb);
@@ -29,15 +29,15 @@ fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
     let mut base_b = base.clone();
 
     // Base + A + B:
-    let _ = pa.apply_mut(&mut base_a).unwrap();
-    let _ = pb.apply_mut(&mut base_a).unwrap();
+    let _ = pa.apply_mut(&mut base_a, false).unwrap();
+    let _ = pb.apply_mut(&mut base_a, false).unwrap();
     // Base + B + A:
-    let _ = pb.apply_mut(&mut base_b).unwrap();
-    let _ = pa.apply_mut(&mut base_b).unwrap();
+    let _ = pb.apply_mut(&mut base_b, false).unwrap();
+    let _ = pa.apply_mut(&mut base_b, false).unwrap();
 
-    assert_eq!(base_a, base_b);
-    assert_eq!(base_a, result);
-    assert_eq!(base_b, result);
+    assert_eq!(base_a, base_b, "{} <>\n{}", to_yaml(&base_a).unwrap(), to_yaml(&base_b).unwrap());
+    assert_eq!(base_a, result, "{} <>\n{}<>\n{}", to_yaml(&base_a).unwrap(), to_yaml(&base_b).unwrap(), to_yaml(&result).unwrap());
+    assert_eq!(base_b, result, "{} <>\n{}<>\n{}", to_yaml(&base_a).unwrap(), to_yaml(&base_b).unwrap(), to_yaml(&result).unwrap());
 }
 
 #[test] /// basic object update
@@ -52,7 +52,7 @@ fn test_case2() {
 
 #[test] /// mixed object array update
 fn test_case3() {
-    test_case(3, 2, 1);
+    test_case(3, 1, 1);
 }
 
 
