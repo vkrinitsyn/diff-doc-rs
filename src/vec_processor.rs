@@ -17,7 +17,7 @@ impl Idx {
 }
 
 fn find_src(src: &HashMap<u64, Vec<Weak<RefCell<Idx>>>>,  sources: &Vec<Rc<RefCell<Idx>>>, hash: u64, work_idx: usize) -> Option<usize> {
-    if let Some(v) = src.get(&hash) {
+    if src.contains_key(&hash) {
         for i in work_idx..sources.len() {
             if hash == sources[i].borrow().hash {
                 return Some(i);
@@ -118,7 +118,7 @@ pub fn compute_vec_diff(old: &Vec<GenericValue>, new: &Vec<GenericValue>, contex
 
         }
     }
-    (0..workspace.len()-new.len()).for_each(|_| { // no need to modify sources as we are done
+    (0..new.len()-workspace.len()).for_each(|_| { // no need to modify sources as we are done
         updates.push(Hunk { path: append_path(context_path, new.len()), value: HunkAction::Remove });
     });
     updates
@@ -199,9 +199,10 @@ mod tests {
     use std::collections::HashMap;
     use std::rc::{Rc, Weak};
     use serde_json::json;
+    use crate::diff::Mismatch;
     use crate::vec_processor::{compute_vec_diff, Idx};
     use crate::generic::{GenericValue, Hunk, HunkAction, DocIndex, hs, from_str_vec};
-    use crate::txt::apply_diff;
+    use crate::{MismatchDoc, MismatchDocMut};
 
     #[test]
     fn test_compute_vec_diff_0() {
@@ -335,17 +336,13 @@ mod tests {
 
     #[test]
     fn test_compute_vec_diff_appl() {
-        let old = from_str_vec(vec!["a","b","c"]);
+        let mut old = from_str_vec(vec!["a","b","c"]);
         let new = from_str_vec(vec!["a","b","d"]);
-        if let GenericValue::Array(old) = &old {
-            if let GenericValue::Array(new) = &new {
-                let diffs = compute_vec_diff(old, new, &vec![]);
-                assert_eq!(diffs.len(), 1);
-                // assert_eq!(diffs[0], Hunk{path:vec![DocIndex::Idx(2)], value: HunkAction::Update(GenericValue::StringValue("d".to_string()))});
-                // apply_diff()
-            }
-        }
-
+        let patch = Mismatch::new(&old, &new).unwrap();
+        let result = patch.apply_mut(&mut old, false);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+        assert_eq!(old, new);
     }
 
 

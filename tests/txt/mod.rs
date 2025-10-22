@@ -3,25 +3,25 @@ use diff_doc::*;
 use diff_doc::txt::Mismatch;
 const BASE: &'static str = "tests/txt";
 
-fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
+fn test_case(id: usize, a_diffs: usize, b_diffs: usize) {
     let base = read_to_string(format!("{}/case{}/base.txt", BASE, id)).unwrap();
     let a = read_to_string(format!("{}/case{}/a.txt", BASE, id)).unwrap();
     let b = read_to_string(format!("{}/case{}/b.txt", BASE, id)).unwrap();
     let result = read_to_string(format!("{}/case{}/result.txt", BASE, id)).unwrap();
 
     let pa = Mismatch::new(&base, &a).unwrap();
-    println!("#{} A [{}]: {}", id, a_cnt, serde_json::to_string(&pa).unwrap());
+    println!("#{} A [{}]: {}", id, a_diffs, serde_json::to_string(&pa).unwrap());
     let pb = Mismatch::new(&base, &b).unwrap();
-    println!("#{} B [{}]: {}", b_cnt, id, serde_json::to_string(&pb).unwrap());
-    assert_eq!(pa.len(), a_cnt);
-    assert_eq!(pb.len(), b_cnt);
+    println!("#{} B [{}]: {}", b_diffs, id, serde_json::to_string(&pb).unwrap());
+    assert_eq!(pa.len(), a_diffs);
+    assert_eq!(pb.len(), b_diffs);
     let x = pa.is_intersect(&pb);
     assert_eq!(x.as_ref().err().map(|e| e.to_string()).unwrap_or("".to_string()), "".to_string());
     assert!(!x.unwrap_or(true));
     assert_eq!(pb.apply(&pa.apply(&base).unwrap()).unwrap(), result);
     assert_eq!(pa.apply(&pb.apply(&base).unwrap()).unwrap(), result);
 
-    println!("#{} AA [{}]: {}", id, a_cnt, Mismatches::Text(pb));
+    println!("#{} AA [{}]: {}", id, a_diffs, Mismatches::Text(pb));
 
 }
 

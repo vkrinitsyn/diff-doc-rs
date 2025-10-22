@@ -13,6 +13,7 @@ use std::fmt::Display;
 pub trait MismatchDoc<T> {
     fn new(base: &T, input: &T) -> Result<Self, DocError> where Self: Sized;
 
+    /// return false if no intersection between two patches and they can apply in any order
     fn is_intersect(&self, other: &Self) -> Result<bool, DocError>;
 
     fn len(&self) -> usize;
@@ -22,7 +23,8 @@ pub trait MismatchDoc<T> {
 pub trait MismatchDocMut<T> {
     
     /// if fail_fast then stop on first error, 
-    /// otherwise try to apply all and collect errors on Ok response 
+    /// otherwise try to apply all and collect errors on Ok response
+    /// - non-transactional behavioral, partial updates possible either on fail_fast!
     fn apply_mut(&self, input: &mut T, fail_fast: bool) -> Result<Vec<DocError>, DocError>;
 }
 

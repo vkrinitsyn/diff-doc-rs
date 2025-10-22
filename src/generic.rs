@@ -62,7 +62,6 @@ pub(crate) fn hs<T: Hash>(input: &T) -> u64 {
     let mut hasher = DefaultHasher::new();
     input.hash(&mut hasher);
     let h = hasher.finish();
-    // #[cfg(debug_assertions)] println!("{input} = {h}");
     h
 }
 
@@ -100,7 +99,7 @@ pub enum HunkAction {
 }
 
 impl HunkAction {
-    pub(crate) fn is_update(&self) -> bool {
+    pub(crate) fn _is_update(&self) -> bool {
         matches!(self, HunkAction::Update(_) | HunkAction::UpdateTxt(_))
     }
 
@@ -137,7 +136,7 @@ impl GenericValue {
         vec![Hunk { path: path.clone(), value: HunkAction::Update(self.clone()) }]
     }
 
-    pub(crate) fn chars(&self) -> Vec<char> {
+    pub(crate) fn _chars(&self) -> Vec<char> {
         match &self {
             GenericValue::StringValue(v) => v.chars().collect(),
             _ => vec![]
@@ -215,6 +214,12 @@ impl GenericValue {
 // --- Parsing Functions ---
 pub fn from_str_vec(s: Vec<&str>) -> GenericValue {
     GenericValue::Array(s.into_iter().map(|v| GenericValue::StringValue(v.to_string())).collect())
+}
+
+pub fn from_str_vec2(s: Vec<(&str, &str)>) -> GenericValue {
+    GenericValue::Map(s.into_iter()
+        .map(|(k,v)| (k.to_string(), GenericValue::StringValue(v.to_string())))
+        .collect())
 }
 
 pub fn from_json(s: &str) -> Result<GenericValue, serde_json::Error> {

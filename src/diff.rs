@@ -89,13 +89,13 @@ impl Hunk {
                                     m.remove(*p);
                                 }
                                 HunkAction::Update(v) => {
-                                    m.insert(p.clone(), v.clone());
+                                    m[*p] = v.clone();
                                 }
                                 HunkAction::UpdateTxt(v) => {
                                     if let GenericValue::StringValue(s) = m.get(*p)
                                             .ok_or_else(|| DocError::new(format!("Path not found: {}", p)))? {
                                         let new_v = txt::Mismatch(v.clone()).apply(s)?;
-                                        m.insert(p.clone(),  GenericValue::StringValue(new_v));
+                                        m[*p] = GenericValue::StringValue(new_v);
                                     } else {
                                         return Err(DocError::new(format!("Expected string field: {}", p)));
                                     }
@@ -170,9 +170,16 @@ impl MismatchDoc<GenericValue> for Mismatch {
         let ranges_b = PathRange::new(&input.0);
 
         for a in &self.0 {
-            if input.0.iter().find_map(|b| Some( is_intersect(a, &ranges_a, b, &ranges_b) || is_intersect(b, &ranges_b, a, &ranges_a) ))
-                .unwrap_or(false) {
-                return Ok(true);
+            for b in &input.0 {
+                if is_intersect(a, &ranges_a, b, &ranges_b, #[cfg(debug_assertions)] "a~b") {
+                    return Ok(true);
+                }
+                #[cfg(debug_assertions)] println!("is_intersect nothing\n");
+
+                if is_intersect(b, &ranges_b, a, &ranges_a, #[cfg(debug_assertions)] "b~a") {
+                    return Ok(true);
+                }
+                #[cfg(debug_assertions)] println!("is_intersect nothing\n");
             }
         }
 
@@ -184,7 +191,9 @@ impl MismatchDoc<GenericValue> for Mismatch {
     }
 }
 
+#[derive(Debug)]
 struct PathRange {
+    /// use as a key
     path: Vec<DocIndex>,
     range: Range,
 }
@@ -196,8 +205,10 @@ impl Hash for PathKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         ".".hash(state);
         for (idx, p) in self.0.iter().enumerate() {
-            if idx == self.0.len() - 2 {
-                break;
+            if idx+1 == self.0.len() {
+                if let DocIndex::Idx(_) = p {
+                    break;
+                }
             }
             p.hash(state);
         }
@@ -210,14 +221,17 @@ impl PathRange {
     fn new(input: &Vec<Hunk>) -> PathMapType {
         let mut ranges: PathMapType = HashMap::new();
         for op in input {
+            debug_assert!(op.path.len() > 0, "invalid hunk with empty path: {:?}", op);
+            // println!("PathRange:: {:?}", op.path[op.path.len()-1]);
             if let DocIndex::Idx(idx) = op.path[op.path.len()-1] {
                 let add = match op.value {
-                    HunkAction::Remove => false,
                     HunkAction::Insert(_) |
                     HunkAction::Clone(_) => true,
-                    _ => { continue; }
+                    _ => false
+                    // _ => { continue; }
                 };
                 let key = PathKey(op.path.clone());
+                // println!("PathKey:: {key:?}");
                 // insert into ranges
                 ranges.get_mut(&key).map(|v| {
                     if v.len() == 0 || v[v.len() - 1].range.add != add {
@@ -240,7 +254,7 @@ impl PathRange {
                     Some(())
                 });
             }
-
+            // println!("{op} ranges: {:?}", ranges);
         }
         ranges//.into_values().flatten().collect()
     }
@@ -253,20 +267,20 @@ impl PathRange {
 }
 
 /// check for intersection of two patches by path for update or delete of documents including vec/array
-fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapType) -> bool {
+fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapType, #[cfg(debug_assertions)] msg: &str) -> bool {
     if a.path.len() == 0 || b.path.len() == 0 {
-        return false; // assert changes
+        return false; // assert no changes
     }
 
     // this is a json path index, the longer path wont intersect with short one if longer do not contain the short
     let comp2idx = min(a.path.len(), b.path.len());
+    // #[cfg(debug_assertions)] println!("is_intersect test {msg} upto {comp2idx} ...\n {a:?}\n{ranges_a:?}\n by: \n {b:?}\n {ranges_b:?}");
 
     // the reverse: check b in ranges_a will be in another call
     for i in 0..comp2idx {
         if let Some(cause) = is_intersect2(a, b, i, !(a.path.len()==b.path.len() && i==comp2idx), ranges_b) {
-            #[cfg(debug_assertions)] println!("is_intersect as step {i} of {comp2idx} by: {cause}\n{a}\n{b}");
-        } else {
-            return false;
+            #[cfg(debug_assertions)] println!("is_intersect {msg} upto {comp2idx} as step {i} of {comp2idx} by: {cause}\nBase action: {a}\nInterfere with: {b}");
+            return true;
         }
     }
 
@@ -276,13 +290,14 @@ fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapTy
             for r in x {
                 for p in v {
                     if p.range.overlap(&r.range) {
+                        #[cfg(debug_assertions)] println!("is_intersect {msg} as overlap {p:?} with {:?}", &r.range);
                         return true;
                     }
                 }
             }
         }
     }
-    true
+    false
 }
 
 /// check for intersection of two patches by path for update or delete of documents including vec/array
@@ -389,7 +404,7 @@ fn is_intersect2(a: &Hunk, b: &Hunk, idx: usize, ignore_val: bool, ranges_b: &Pa
 
 #[cfg(test)]
 mod tests {
-    use crate::generic::{from_json, from_yaml, hs, to_json, to_yaml, NumericString};
+    use crate::generic::{from_json, from_str_vec, from_str_vec2, from_yaml, hs, to_json, to_yaml, NumericString};
     use super::*;
 
     #[test]
@@ -540,5 +555,51 @@ mod tests {
         println!("Deserialized JSON null: {:?}", my_data_null);
         // Expected output: Deserialized JSON null: Null
     }
+
+    #[test]
+    fn test_intersect_map() {
+        let base = from_str_vec2(vec![("a", "b"), ("c", "d")]);
+        println!("Base: {:?}", base);
+        let patch1 = Mismatch::new(&base, &from_str_vec2(vec![("a", "b1"), ("c", "d")])).unwrap();
+        let patch2 = Mismatch::new(&base, &from_str_vec2(vec![("a", "b"), ("c", "d2")])).unwrap();
+        let patch3 = Mismatch::new(&base, &from_str_vec2(vec![("a", "e"), ("c", "f")])).unwrap();
+        println!("1~2 {:?}\n vs {:?}", patch1, patch2);
+        assert!(!patch1.is_intersect(&patch2).unwrap(), "{:?} vs {:?}", patch1, patch2);
+        println!("1~3 {:?}\n vs {:?}", patch1, patch3);
+        assert!(patch1.is_intersect(&patch3).unwrap(), "{:?} vs {:?}", patch2, patch3);
+        println!("2~3 {:?}\n vs {:?}", patch2, patch3);
+        assert!(patch2.is_intersect(&patch3).unwrap(), "{:?} vs {:?}", patch2, patch3);
+    }
+
+
+    #[test]
+    fn test_intersect_vec() {
+        let base = from_str_vec(vec!["a", "b", "c"]);
+        let patch1 = Mismatch::new(&base, &from_str_vec(vec!["a","b","d"])).unwrap();
+        let patch2 = Mismatch::new(&base, &from_str_vec(vec!["a","f","c"])).unwrap();
+        let patch3 = Mismatch::new(&base, &from_str_vec(vec!["a","f","e"])).unwrap();
+        println!("1~2 {:?}\n vs {:?}", patch1, patch2);
+        assert!(!patch1.is_intersect(&patch2).unwrap(), "{:?} vs {:?}", patch1, patch2);
+        println!("\n1~3 {:?}\n vs {:?}", patch1, patch3);
+        assert!(patch1.is_intersect(&patch3).unwrap(), "{:?} vs {:?}", patch2, patch3);
+        println!("2~3 {:?}\n vs {:?}", patch2, patch3);
+        assert!(patch2.is_intersect(&patch3).unwrap(), "{:?} vs {:?}", patch2, patch3);
+    }
+
+
+    #[test]
+    fn test_intersect_vec2() {
+        let base = from_str_vec(vec!["a", "b", "c"]);
+        let patch1 = Mismatch::new(&base, &from_str_vec(vec!["a","b","d"])).unwrap();
+        let patch2 = Mismatch::new(&base, &from_str_vec(vec!["a","f","c"])).unwrap();
+        let patch3 = Mismatch::new(&base, &from_str_vec(vec!["a", "x", "b", "c"])).unwrap();
+        println!("1~2 {:?}\n vs {:?}", patch1, patch2);
+        assert!(!patch1.is_intersect(&patch2).unwrap(), "{:?} vs {:?}", patch1, patch2);
+        println!("\n1~3 {:?}\n vs {:?}", patch1, patch3);
+        assert!(patch1.is_intersect(&patch3).unwrap(), "{:?} vs {:?}", patch2, patch3);
+        println!("2~3 {:?}\n vs {:?}", patch2, patch3);
+        assert!(patch2.is_intersect(&patch3).unwrap(), "{:?} vs {:?}", patch2, patch3);
+    }
+
 
 }

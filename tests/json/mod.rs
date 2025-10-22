@@ -9,18 +9,18 @@ fn read_json(id: usize, name: &str) -> GenericValue {
     from_json(read_to_string(format!("tests/json/case{}/{}.json", id, name)).unwrap().as_str()).unwrap()
 }
 
-fn test_case(id: usize, a_cnt: usize, b_cnt: usize) {
+fn test_case(id: usize, a_diffs: usize, b_diffs: usize) {
     let base = read_json(id, "base");
     let a = read_json(id, "a");
     let b = read_json(id, "b");
     let result = read_json(id, "result");
 
     let pa = Mismatch::new(&base, &a).unwrap();
-    println!("#{} A [{}]: {:?}", id, a_cnt, pa);
+    println!("#{} A [{}]: {:?}", id, a_diffs, pa);
     let pb = Mismatch::new(&base, &b).unwrap();
-    println!("#{} B [{}]: {:?}", b_cnt, id, pb);
-    assert_eq!(pa.len(), a_cnt);
-    assert_eq!(pb.len(), b_cnt);
+    println!("#{} B [{}]: {:?}", b_diffs, id, pb);
+    assert_eq!(pa.len(), a_diffs);
+    assert_eq!(pb.len(), b_diffs);
     let x = pa.is_intersect(&pb);
     assert!(x.is_ok(), "is_intersect parsing");
     assert!(!x.unwrap(), "is_intersect");
@@ -52,7 +52,7 @@ fn test_case2() {
 
 #[test] /// mixed object array update
 fn test_case3() {
-    test_case(3, 1, 1);
+    test_case(3, 2, 1);
 }
 
 
