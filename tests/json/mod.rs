@@ -52,7 +52,7 @@ fn test_case2() {
 
 #[test] /// mixed object array update
 fn test_case3() {
-    test_case(3, 2, 1);
+    test_case(3, 1, 2);
 }
 
 

@@ -1,5 +1,7 @@
 [
   {"name": "json file case3"},
   {"name": "base changed"},
-  {"name": "line"}
+  {"name": "line"},
+  {"name": "to delete"},
+  {"name": "the end"}
 ]

@@ -118,9 +118,11 @@ pub fn compute_vec_diff(old: &Vec<GenericValue>, new: &Vec<GenericValue>, contex
 
         }
     }
-    (0..new.len()-workspace.len()).for_each(|_| { // no need to modify sources as we are done
-        updates.push(Hunk { path: append_path(context_path, new.len()), value: HunkAction::Remove });
-    });
+    if workspace.len() > new.len() {
+        (0..workspace.len() - new.len()).for_each(|_| { // no need to modify sources as we are done
+            updates.push(Hunk { path: append_path(context_path, new.len()), value: HunkAction::Remove });
+        });
+    }
     updates
 }
 

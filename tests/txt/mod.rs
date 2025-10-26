@@ -16,6 +16,7 @@ fn test_case(id: usize, a_diffs: usize, b_diffs: usize) {
     assert_eq!(pa.len(), a_diffs);
     assert_eq!(pb.len(), b_diffs);
     let x = pa.is_intersect(&pb);
+    println!("#{} X [{}]: {:?}", id, a_diffs, x);
     assert_eq!(x.as_ref().err().map(|e| e.to_string()).unwrap_or("".to_string()), "".to_string());
     assert!(!x.unwrap_or(true));
     assert_eq!(pb.apply(&pa.apply(&base).unwrap()).unwrap(), result);
@@ -37,5 +38,5 @@ fn test_case2() {
 
 #[test]
 fn test_case3() {
-    test_case(3, 2, 3);
+    test_case(3, 1, 1);
 }

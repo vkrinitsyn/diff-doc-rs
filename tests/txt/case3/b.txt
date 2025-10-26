@@ -1,2 +1,6 @@
 base text file case3
 line change
+another line
+deleted line
+final line
+end of file

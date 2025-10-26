@@ -78,6 +78,7 @@ pub enum DocIndex {
 /// value of changes
 pub enum HunkAction {
     /// remove array element or map or document node
+    /// if applied to array, then elements will shift left
     Remove,
 
     /// update element to a new value
@@ -87,14 +88,16 @@ pub enum HunkAction {
     UpdateTxt(Vec<DiffOp>),
 
     /// update element of a document to a new value, same as Update for map DocIndex, but insert a new for array's DocIndex
+    /// if applied to array, then elements will shift right
     Insert(GenericValue),
 
     /// use next Remove if need to delete the old position
     /// DocIndex must match the type of element at path
     Swap(DocIndex),
 
-    /// do insert with shift right
+    /// Copy existing elements 
     /// DocIndex must match the type of element at path
+    /// if applied to array, then elements will shift right
     Clone(DocIndex),
 }
 
@@ -323,241 +326,7 @@ impl<'de> Deserialize<'de> for NumericString {
     }
 }
 
-/*
-impl MismatchDocMut<GenericValue> for Mismatch {
-    fn apply_mut(&self, input: &mut GenericValue) -> Result<(), DocError> {
-        for h in &self.0 {
-            match &h.value {
-                /*
-                None => {
-                    self.remove(&h.path, input);
-                }
-                Some(v) => {
-                    self.modify(&h.path, v.clone(), input);
-                }
-                */
-                HunkAction::Remove => {}
-                HunkAction::Update(_) => {}
-                HunkAction::UpdateString(_) => {}
-                HunkAction::Replace(_, _) => {}
-                HunkAction::Clone(_) => {}
-            }
-        }
-        Ok(())
-    }
-}
 
-
-//
-
-
-impl Mismatch {
-
-    fn remove(&self, path: &Vec<DocIndex>, json_root: &mut GenericValue) {
-        let mut input = json_root;  // current json node pointer
-        for path_index in 0..path.len() {
-            let last_element = path_index == path.len() - 1;
-            match &path[path_index] {
-                DocIndex::Name(path) => {
-                    if input.is_object() {
-                        if last_element { // do delete
-                            input.as_object_mut().unwrap().remove(path);
-                        } else { // do traverse
-                            match input.as_object_mut().unwrap().get_mut(path) {
-                                None => {
-                                    // no such field for go into for removal - ignore
-                                    return;
-                                }
-                                Some(m) => {
-                                    input = m;
-                                }
-                            }
-                        }
-                    } else {
-                        // discrepancy on path: expected object, but it is not
-                        return;
-                    }
-                }
-                DocIndex::Idx(idx) => {
-                    if input.is_array() {
-                        if last_element { // do delete
-                            input.as_array_mut().unwrap().remove(*idx);
-                        } else { // do traverse
-                            match input.as_array_mut().unwrap().get_mut(*idx) {
-                                None => {
-                                    // no such field for go into for removal - ignore
-                                    return;
-                                }
-                                Some(m) => {
-                                    input = m;
-                                }
-                            }
-                        }
-                    } else {
-                        // discrepancy on path: expected array, but it is not
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
-    fn modify(&self, path: &Vec<DocIndex>, value: GenericValue, json_root: &mut GenericValue) {
-        let mut input = json_root; // current json node pointer
-        for path_index in 0..path.len() {
-            let last_element = path_index == path.len() - 1;
-            match &path[path_index] {
-                DocIndex::Name(path) => {
-                    if last_element {
-                        if input.is_object() { //
-                            input.as_object_mut().unwrap().insert(path.to_string(), value);
-                            return;
-                        }
-                        //
-                    } else { // traverse
-                        if input.get(path).is_none() { // set object if it is not
-                            input.as_object_mut().unwrap().insert(path.to_string(),
-                                                                  Value::Object(serde_json::Map::new())
-                            );
-                        }
-                        input = input.as_object_mut().unwrap().get_mut(path).unwrap();
-                    }
-                }
-                DocIndex::Idx(idx) => {
-                    if input.is_array() {
-                        let input_len = input.as_array().map(|a| a.len()).unwrap_or(0);
-
-                        for _i in input_len..*idx + 1 {
-                            input.as_array_mut().unwrap().push(Value::Null);
-                        }
-                        if last_element {
-                            // set value at the end of path
-                            if let Some(e) = input.get_mut(idx) {
-                                // set array element
-                                *e = value;
-                            }
-                            return;
-                        } else {
-                            // set pointer to required array element to move to next path element
-                            input = input.get_mut(idx).unwrap();
-                        }
-                    } else {
-                        // mismatch types - expected array but found something else
-                        // replace existing object with array
-                        *input = GenericValue::Array(repeat(GenericValue::Null.clone()).take(*idx + 1).collect());
-                        if last_element {
-                            *input.as_array_mut().unwrap().get_mut(*idx).unwrap() = value;
-                            return;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-}
-
-
-impl MismatchDoc<GenericValue> for Mismatch {
-    fn new(base: &GenericValue, input: &GenericValue) -> Result<Self, DocError>
-    where
-        Self: Sized
-    {
-        Ok(Mismatch(jdiff(base, &input, &vec![])))
-    }
-
-    fn is_intersect(&self, input: &Self) -> Result<bool, DocError> {
-        for a in &self.0 {
-            if input.0.iter().find_map(|b| Some( is_intersect(a, b) || is_intersect(b, a) ))
-                .unwrap_or(false) {
-                return Ok(true);
-            }
-        }
-
-        Ok(false)
-    }
-
-    fn len(&self) -> usize {
-        self.0.len()
-    }
-}
-
-/// check for intersection of two patches by path for update or delete of documents including vec/array
-fn is_intersect(a: &Hunk, b: &Hunk) -> bool {
-    if a.path.len() == 0 || b.path.len() == 0 {
-        return false; // assert changes
-    }
-
-    // this is a json path index, the longer path wont intersect with short one if longer do not contain the short
-    let comp2idx = min(a.path.len(), b.path.len());
-
-    for i in 0..comp2idx {
-        if let Some(cause) = is_intersect2(a,b,i, !(a.path.len()==b.path.len() && i==comp2idx)) {
-            #[cfg(debug_assertions)] println!("is_intersect as step {i} of {comp2idx} by: {cause}\n{a}\n{b}");
-        } else {
-            return false;
-        }
-    }
-    true
-}
-
-/// check for intersection of two patches by path for update or delete of documents including vec/array
-fn is_intersect2(a: &Hunk, b: &Hunk, idx: usize, ignore_val: bool) -> Option<&'static str> {
-    match &a.path[idx] {
-        DocIndex::Name(a_path) => {
-            match &b.path[idx] {
-                DocIndex::Name(b_path) => {
-                    if a_path == b_path && (ignore_val || &a.value != &b.value) {
-                        Some("diff values ")
-                    } else { None }
-                }
-                DocIndex::Idx(_) => {
-                    if !ignore_val || a.value.is_none() || b.value.is_none() {
-                        Some("discrepancy in types name-idx, but in case of delete - no matter")
-                    } else { None }
-                }
-            }
-        }
-        DocIndex::Idx(a_idx) => {
-            match &b.path[idx] {
-                DocIndex::Name(_) => {
-                    if !ignore_val || a.value.is_none() || b.value.is_none() {
-                        Some("discrepancy in types idx-name, but in case of delete - no matter")
-                    } else { None }
-                }
-                DocIndex::Idx(b_idx) => {
-                    match &a.value {
-                        None => {
-                            match &b.value {
-                                None => Some("remove both - undefined second remove index after first remove & shift"),
-                                Some(_) => {
-                                    if  !ignore_val && a_idx > b_idx {
-                                        Some("update b, remove a")
-                                    } else { None }
-                                }
-                            }
-                        }
-                        Some(a_value) => {
-                            match &b.value {
-                                None => {
-                                    if !ignore_val && b_idx > a_idx {
-                                        Some("update a, remove b")
-                                    } else { None }
-                                }
-                                Some(b_value) => {
-                                    if a_idx == b_idx && (!ignore_val || (ignore_val && a_value != b_value)) {
-                                        Some("intersect only on same fields and unequal new values")
-                                    } else { None }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-*/
 #[cfg(test)]
 mod tests {
     use super::*;

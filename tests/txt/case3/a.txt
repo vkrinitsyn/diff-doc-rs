@@ -1,2 +1,5 @@
 base text file case3
 line
+another line
+final line
+end of file
