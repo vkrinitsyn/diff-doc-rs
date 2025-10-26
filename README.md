@@ -10,7 +10,8 @@ The main goal is to provide Rust lib for a 3-way offline compare-apply for imple
 
 Base vs Document_A vs Document_B should provide Base doc with mixed change from A & B if no conflicts present.
 
-> Base + patch_A + patch_B = Base + patch_B + patch_A
+> [!IMPORTANT]
+> Base + patch_A + patch_B = Base + patch_B + patch_A; if patch_A and patch_B are disjoint.
 
 The implementation run in steps:
 1. Receive change on a Base document from host/user A and produce a Patch_A. 
@@ -26,11 +27,11 @@ Same apply for simplified plain text patch where line nimber use as index.
 ### Support documents type:
 
 - [x] Json - default format for Postgres document storage
-- [x] Diff - plain text document with default diff file format, wrapper to diffy
 - [x] Text - plain text simplified diff as arrays of strings
-- [ ] XML - todo
-- [ ] Yaml - todo
+- [x] XML - serde-xml-rs
+- [x] Yaml - serde_yaml
+- [x] Toml - toml-rs
+- [x] Diff - plain text document with default diff file format, wrapper to diffy (optional feature)
 
 ### TODO
-- Add idempotent like capabilities for a text patching in case of 3-way: Exclude already applied hunks from a patch about to apply. 
-Modify intersections to allow same changes on a particular line.
+- Add more examples to integration tests
