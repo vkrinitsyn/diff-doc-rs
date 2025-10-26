@@ -4,6 +4,10 @@
 
 Create and restore diff mismatch from text or json file.
 
+> [!NOTE]
+> Providing patch with minimal changes to list and map structure.
+> In addition to the regular patch operations of insert, update, and delete, it includes swap and clone to reduce patch size.
+
 Also support standard diff for text files.
 
 The main goal is to provide Rust lib for a 3-way offline compare-apply for implement commutative style document change:
