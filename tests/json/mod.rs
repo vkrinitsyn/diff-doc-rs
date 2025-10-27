@@ -3,7 +3,7 @@ extern crate diff_doc;
 use std::fs::read_to_string;
 use diff_doc::{MismatchDoc, MismatchDocMut};
 use diff_doc::diff::Mismatch;
-use diff_doc::generic::{from_json, to_json, to_yaml, GenericValue};
+use diff_doc::generic::{from_json, to_yaml, GenericValue};
 
 fn read_json(id: usize, name: &str) -> GenericValue {
     from_json(read_to_string(format!("tests/json/case{}/{}.json", id, name)).unwrap().as_str()).unwrap()

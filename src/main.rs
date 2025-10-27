@@ -1,6 +1,4 @@
-use serde_json::json;
-use diff_doc::*;
-use diff_doc::diff::Mismatch;
+// use diff_doc::*;
 
 /**
 usage examples

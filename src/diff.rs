@@ -192,6 +192,7 @@ impl MismatchDoc<GenericValue> for Mismatch {
 #[derive(Debug)]
 struct PathRange {
     /// use as a key
+    #[allow(unused)]
     path: Vec<DocIndex>,
     range: Range,
 }
@@ -254,7 +255,7 @@ impl PathRange {
         ranges
     }
 
-    fn overlap(&self, other: &Self) -> bool {
+    fn _overlap(&self, other: &Self) -> bool {
         self.range.overlap(&other.range)
     }
 
@@ -262,7 +263,7 @@ impl PathRange {
 }
 
 /// check for intersection of two patches by path for update or delete of documents including vec/array
-fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapType, #[cfg(debug_assertions)] msg: &str) -> bool {
+fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapType, #[cfg(debug_assertions)] _msg: &str) -> bool {
     if a.path.len() == 0 || b.path.len() == 0 {
         return false; // assert no changes
     }
@@ -273,7 +274,6 @@ fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapTy
     // the reverse: check b in ranges_a will be in another call
     for i in 0..comp2idx {
         let cmp_val = a.path.len() == i+1 || b.path.len() == i+1;
-        format!("checking path idx {i} for {:?} vs {:?}", a.path[i], b.path[i]);
         if !cmp_val {
             if a.path[i] != b.path[i]
             {
@@ -281,8 +281,8 @@ fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapTy
             }
         }
 
-        if let Some(cause) = is_intersect2(a, b, i, ranges_b) {
-            #[cfg(feature="verbose")] println!("is_intersect {msg} upto {comp2idx} as step {i} of {comp2idx} by: {cause}\nBase action: {a}\nInterfere with: {b}");
+        if let Some(_cause) = is_intersect2(a, b, i, ranges_b) {
+            #[cfg(feature="verbose")] println!("is_intersect {_msg} upto {comp2idx} as step {i} of {comp2idx} by: {_cause}\nBase action: {a}\nInterfere with: {b}");
             return true;
         }
     }

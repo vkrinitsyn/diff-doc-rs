@@ -20,7 +20,7 @@ pub enum DiffOp {
 
 impl DiffOp {
     /// Returns true if this operation shift left or right
-    fn is_delete_insert(&self) -> bool {
+    fn _is_delete_insert(&self) -> bool {
         match &self {
             DiffOp::Remove{..} => true,
             DiffOp::Insert{..} => true,
@@ -314,7 +314,7 @@ pub fn compute_diff(old: &Vec<&str>, new: &Vec<&str>) -> Vec<DiffOp> {
 }
 
 /// Compute modified slices (hunks) between equal regions.
-fn compute_hunks(old: &Vec<&str>, new: &Vec<&str>) -> Vec<Chunk> {
+fn _compute_hunks(old: &Vec<&str>, new: &Vec<&str>) -> Vec<Chunk> {
     let dp = lcs_table(old, new);
     let matches = backtrack_matches(old, new, &dp);
 
@@ -351,7 +351,8 @@ fn compute_hunks(old: &Vec<&str>, new: &Vec<&str>) -> Vec<Chunk> {
 
 /// Apply the diff ops to `old`, returning the transformed Vec<String>.
 /// Prints inputs, diff, and output (prints MUST be in apply).
-pub (crate) fn apply_diff2<'a>(old: &Vec<&'a str>, target: &Vec<&str>, ops: &'a Vec<DiffOp>) -> Result<Vec<String>, String> {
+#[cfg(test)]
+fn apply_diff2<'a>(old: &Vec<&'a str>, target: &Vec<&str>, ops: &'a Vec<DiffOp>) -> Result<Vec<String>, String> {
     fn print_vecs<'a>(label: &str, v: &[&'a str]) {
         println!("{} (len={}):", label, v.len());
         for (i, s) in v.iter().enumerate() {
@@ -535,22 +536,22 @@ impl MismatchDoc<String> for Mismatch {
 }
 
 impl Mismatch {
-    fn min2delete(&self) -> Option<usize> {
+    fn _min2delete(&self) -> Option<usize> {
         self.0.iter()
-            .filter(| v| v.is_delete_insert())
+            .filter(| v| v._is_delete_insert())
             .map(|k| k.index()).min()
     }
 
-    fn max2update(&self) -> Option<usize> {
+    fn _max2update(&self) -> Option<usize> {
         self.0.iter()
-            .filter(| v| !v.is_delete_insert())
+            .filter(| v| !v._is_delete_insert())
             .map(|k| k.index()).max()
     }
 
     /// the minimum remove index (None in value) must be greater than update
     fn _valid(&self) -> bool {
-        self.min2delete()
-            .map(|m| m >= self.max2update().unwrap_or(0))
+        self._min2delete()
+            .map(|m| m >= self._max2update().unwrap_or(0))
             .unwrap_or(true)
     }
 }
@@ -646,7 +647,7 @@ mod tests {
         let old = vec!["a".into(), "b".into(), "c".into(), "d".into()];
         let new = vec!["a".into(), "x".into(), "c".into(), "y".into(), "d".into()];
 
-        let hunks = compute_hunks(&old, &new);
+        let hunks = _compute_hunks(&old, &new);
         assert_eq!(hunks.len(), 2);
         assert_eq!(
             hunks[0],

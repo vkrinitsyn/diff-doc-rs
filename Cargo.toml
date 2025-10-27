@@ -3,6 +3,10 @@
 name = "diff_doc"
 version = "0.6.1"
 edition = "2024"
+description = "A document diffing library supporting multiple formats (JSON, YAML, XML, TOML)."
+license = "MIT"
+repository = "https://github.com/vkrinitsyn/diff-doc-rs"
+authors = ["Vladimir Krinitsyn"]
 
 
 [dependencies]
