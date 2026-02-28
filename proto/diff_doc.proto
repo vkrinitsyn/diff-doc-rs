@@ -1,3 +1,5 @@
+/*%LPH%*/
+
 syntax = "proto3";
 
 package diff_doc;

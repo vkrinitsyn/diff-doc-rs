@@ -1,3 +1,5 @@
+/*%LPH%*/
+
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
