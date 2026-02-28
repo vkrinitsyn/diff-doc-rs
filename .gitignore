@@ -13,3 +13,5 @@ Cargo.lock
 .cl*
 c/*.obj
 c/*.exe
+c/*.a
+c/*.o

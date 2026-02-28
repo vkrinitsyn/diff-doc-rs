@@ -1,7 +1,7 @@
 CC       := gcc
 CFLAGS   := -std=c11 -Wall -Wextra -pedantic -O2
 PROTO    := ../proto/diff.proto
-PROTO_C  := mismatches.pb-c
+PROTO_C  := diff.pb-c
 
 # Detect protobuf-c via pkg-config, fall back to plain -lprotobuf-c
 PBCFLAGS := $(shell pkg-config --cflags protobuf-c 2>/dev/null)
