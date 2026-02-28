@@ -33,7 +33,7 @@ fn test_case1() {
 
 #[test]
 fn test_case2() {
-    test_case(2, 1, 2);
+    test_case(2, 1, 3);
 }
 
 #[test]

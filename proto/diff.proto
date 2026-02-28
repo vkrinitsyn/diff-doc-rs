@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package diff_doc;
+
+// ─── Top-level ──────────────────────────────────────────────────────────────
+
+// Corresponds to enum Mismatches in src/lib.rs
+message Mismatches {
+  oneof kind {
+    string     patch = 1; // patch::Mismatch (feature = "patch") — raw GNU patch text
+    DocMismatch doc  = 2; // diff::Mismatch  — structured JSON/document diff
+    TxtMismatch text = 3; // txt::Mismatch   — line-level text diff
+  }
+}
+
+// ─── diff::Mismatch ──────────────────────────────────────────────────────────
+
+// Corresponds to diff::Mismatch(Vec<Hunk>) in src/diff.rs
+message DocMismatch {
+  repeated Hunk hunks = 1;
+}
+
+// Corresponds to generic::Hunk in src/generic.rs
+// serde renames: path → "p", value → "v"
+message Hunk {
+  repeated DocIndex path  = 1; // "p"
+  HunkAction        value = 2; // "v"
+}
+
+// Corresponds to generic::DocIndex in src/generic.rs
+// serde renames: Name → "n", Idx → "i"
+message DocIndex {
+  oneof kind {
+    string name = 1; // "n"
+    uint64 idx  = 2; // "i"
+  }
+}
+
+// Corresponds to generic::HunkAction in src/generic.rs
+message HunkAction {
+  oneof kind {
+    bool         remove     = 1; // Remove (unit variant — set true)
+    GenericValue update     = 2; // Update(GenericValue)
+    TxtMismatch  update_txt = 3; // UpdateTxt(Vec<DiffOp>)
+    GenericValue insert     = 4; // Insert(GenericValue)
+    DocIndex     swap       = 5; // Swap(DocIndex)
+    DocIndex     clone      = 6; // Clone(DocIndex)
+  }
+}
+
+// Corresponds to generic::GenericValue in src/generic.rs (untagged serde)
+message GenericValue {
+  oneof kind {
+    string           numeric = 1; // Numeric(NumericString) — number stored as string
+    GenericMap       map     = 2; // Map(HashMap<String, GenericValue>)
+    GenericArray     array   = 3; // Array(Vec<GenericValue>)
+    bool             boolean = 4; // Boolean(bool)
+    string           string  = 5; // StringValue(String)
+    bool             null    = 6; // Null (set true)
+  }
+}
+
+message GenericMap {
+  map<string, GenericValue> fields = 1;
+}
+
+message GenericArray {
+  repeated GenericValue items = 1;
+}
+
+// ─── txt::Mismatch ───────────────────────────────────────────────────────────
+
+// Corresponds to txt::Mismatch(Vec<DiffOp>) in src/txt.rs
+message TxtMismatch {
+  repeated DiffOp ops = 1;
+}
+
+// Corresponds to txt::DiffOp in src/txt.rs
+message DiffOp {
+  oneof kind {
+    DiffOpRemove remove = 1; // Remove { index }
+    DiffOpInsert insert = 2; // Insert { index, value }
+    DiffOpUpdate update = 3; // Update { index, value }
+    DiffOpAppend append = 4; // Append { index, pos, value }
+  }
+}
+
+message DiffOpRemove {
+  uint64 index = 1;
+}
+
+message DiffOpInsert {
+  uint64 index = 1;
+  string value = 2;
+}
+
+message DiffOpUpdate {
+  uint64 index = 1;
+  string value = 2;
+}
+
+message DiffOpAppend {
+  uint64 index = 1;
+  uint64 pos   = 2;
+  string value = 3;
+}

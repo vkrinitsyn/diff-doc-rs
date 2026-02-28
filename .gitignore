@@ -10,3 +10,6 @@ target
 Cargo.lock
 .vscode/
 .DS_Store
+.cl*
+c/*.obj
+c/*.exe
