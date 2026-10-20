@@ -1,3 +1,4 @@
+#![forbid(unsafe_code)]
 #[cfg(feature="patch")] pub mod patch;
 pub mod txt;
 pub mod diff;

@@ -2,6 +2,12 @@
 
 ### Calculate diff on structured documents with commutative patch apply.
 
+Provided by [DBinvent](https://www.dbinvent.com), and an essential part of
+[YT Cluster](https://www.dbinvent.com/cluster/): each node's schema gate compares
+its live schema with the leader's through these diffs before any data is compared,
+and when two writers change the same list in a replicated jsonb document, both
+changes apply if they are disjoint.
+
 Create and restore diff mismatch from text or json file.
 
 > [!NOTE]
@@ -33,7 +39,7 @@ Same apply for simplified plain text patch where line nimber use as index.
 - [x] Json - default format for Postgres document storage
 - [x] Text - plain text simplified diff as arrays of strings
 - [x] XML - serde-xml-rs
-- [x] Yaml - serde_yaml
+- [x] Yaml - serde-saphyr
 - [x] Toml - toml-rs
 - [x] Diff - plain text document with default diff file format, wrapper to diffy (optional feature)
 

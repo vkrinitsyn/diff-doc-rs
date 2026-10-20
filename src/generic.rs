@@ -113,10 +113,10 @@ impl HunkAction {
 pub struct Hunk {
     /// path to an element to operate with
     #[serde(rename ="p")]
-    pub(crate) path: Vec<DocIndex>,
+    pub path: Vec<DocIndex>,
     /// command to handle
     #[serde(rename ="v")]
-    pub(crate) value: HunkAction,
+    pub value: HunkAction,
 }
 
 impl Hunk {
@@ -229,8 +229,8 @@ pub fn from_json(s: &str) -> Result<GenericValue, serde_json::Error> {
     serde_json::from_str(s)
 }
 
-pub fn from_yaml(s: &str) -> Result<GenericValue, serde_yaml::Error> {
-    serde_yaml::from_str(s)
+pub fn from_yaml(s: &str) -> Result<GenericValue, serde_saphyr::Error> {
+    serde_saphyr::from_str(s)
 }
 
 pub fn from_toml(s: &str) -> Result<GenericValue, toml::de::Error> {
@@ -246,8 +246,8 @@ pub fn to_json(value: &GenericValue) -> Result<String, serde_json::Error> {
     serde_json::to_string_pretty(value)
 }
 
-pub fn to_yaml(value: &GenericValue) -> Result<String, serde_yaml::Error> {
-    serde_yaml::to_string(value)
+pub fn to_yaml(value: &GenericValue) -> Result<String, serde_saphyr::SerializeError> {
+    serde_saphyr::to_string(value)
 }
 
 pub fn to_toml(value: &GenericValue) -> Result<String, toml::ser::Error> {
@@ -478,6 +478,39 @@ mod tests {
 
         println!("Deserialized JSON null: {:?}", my_data_null);
         // Expected output: Deserialized JSON null: Null
+    }
+
+    /// The same document as JSON, YAML and TOML is the same GenericValue: numbers
+    /// (a quoted one too), booleans, strings, lists and nested maps, and null where
+    /// the format has one. Pinned on serde_yaml and toml 0.9, before serde-saphyr
+    /// and toml 1 took their place
+    #[test]
+    fn json_yaml_and_toml_parse_into_the_same_values() {
+        let json = r#"{"name": "Rustacean", "age": 30, "ratio": 1.5, "neg": -7, "cool": true,
+            "tags": ["serde", "tokio"], "details": {"version": "1.5", "empty": "", "deep": {"ids": [1, 2]}}}"#;
+        let yaml = "name: Rustacean\nage: 30\nratio: 1.5\nneg: -7\ncool: true\ntags:\n  - serde\n  - tokio\n\
+            details:\n  version: '1.5'\n  empty: ''\n  deep:\n    ids: [1, 2]\n";
+        let toml = "name = \"Rustacean\"\nage = 30\nratio = 1.5\nneg = -7\ncool = true\ntags = [\"serde\", \"tokio\"]\n\
+            \n[details]\nversion = \"1.5\"\nempty = \"\"\n\n[details.deep]\nids = [1, 2]\n";
+        let j = from_json(json).unwrap();
+        assert_eq!(from_yaml(yaml).unwrap(), j, "yaml");
+        assert_eq!(from_toml(toml).unwrap(), j, "toml");
+        assert_eq!(from_yaml("a: ~\nb: null\n").unwrap(), from_json(r#"{"a": null, "b": null}"#).unwrap(), "yaml null");
+    }
+
+    /// What to_yaml and to_toml write, from_yaml and from_toml read back as it was
+    /// (TOML has no null, so its document has none)
+    #[test]
+    fn yaml_and_toml_read_back_what_they_write() {
+        let v = from_json(r#"{"name": "Rustacean", "age": 30, "ratio": 1.5, "neg": -7, "cool": false,
+            "tags": ["serde", "tokio"], "details": {"version": "1.5", "empty": "", "deep": {"ids": [1, 2]}}}"#).unwrap();
+        let y = to_yaml(&v).unwrap();
+        assert_eq!(from_yaml(&y).unwrap(), v, "{}", y);
+        let t = to_toml(&v).unwrap();
+        assert_eq!(from_toml(&t).unwrap(), v, "{}", t);
+        let n = from_json(r#"{"gone": null, "list": [null, 1]}"#).unwrap();
+        let y = to_yaml(&n).unwrap();
+        assert_eq!(from_yaml(&y).unwrap(), n, "{}", y);
     }
 
 }
