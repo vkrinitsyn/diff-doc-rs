@@ -21,7 +21,7 @@ serde-xml-rs = "^0.8"
 
 # YAML (generic.rs). Not serde_yaml: deprecated, and its unsafe-libyaml is
 # unmaintained (RUSTSEC-2024-0449). serde-saphyr has no unsafe code; ^1.3 as etcds
-serde-saphyr = "^1.3"
+serde-saphyr = "^2.0"
 toml = "^1"
 
 
