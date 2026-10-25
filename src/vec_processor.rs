@@ -16,6 +16,7 @@ impl Idx {
     }
 }
 
+/// an element of the old not yet used, at work_idx or after, equal to the new's one
 fn find_src(src: &HashMap<u64, Vec<Weak<RefCell<Idx>>>>,  sources: &Vec<Rc<RefCell<Idx>>>, hash: u64, work_idx: usize) -> Option<usize> {
     if src.contains_key(&hash) {
         for i in work_idx..sources.len() {
@@ -58,9 +59,15 @@ pub fn compute_vec_diff(old: &Vec<GenericValue>, new: &Vec<GenericValue>, contex
     }
 
     let mut targets: HashMap<u64, Vec<usize>> = HashMap::new();
-    for (i, v) in new.iter().enumerate() {  // hash to (index, is_used and must not remove operation)
-        targets.entry(hs(v)).or_insert_with(Vec::new).push(i);
+    let new_hashes: Vec<u64> = new.iter().map(hs).collect();
+    for (i, h) in new_hashes.iter().enumerate() {  // hash to (index, is_used and must not remove operation)
+        targets.entry(*h).or_insert_with(Vec::new).push(i);
     }
+    // an element equal to the new one at work_index, already in place before it: the
+    // hunks apply in order, so the document's first elements are new's own then - a
+    // Clone of it sends no value
+    let placed = |work_index: usize| (0..work_index)
+        .find(|&k| new_hashes[k] == new_hashes[work_index] && new[k] == new[work_index]);
 
     // implement strategy based of function docs:
     //  - identify shift indices left or right in old as we go to get a target index in new
@@ -77,7 +84,10 @@ pub fn compute_vec_diff(old: &Vec<GenericValue>, new: &Vec<GenericValue>, contex
             // no future insert to workspace for all remining new values
             updates.push(Hunk {
                 path: append_path(context_path, work_index),
-                value: HunkAction::Insert(new_value.clone()),
+                value: match placed(work_index) {
+                    Some(fi) => HunkAction::Clone(DocIndex::Idx(fi)),
+                    None => HunkAction::Insert(new_value.clone()),
+                },
             });
         } else {
             let new_hash = hs(new_value);
@@ -86,32 +96,29 @@ pub fn compute_vec_diff(old: &Vec<GenericValue>, new: &Vec<GenericValue>, contex
                 let path = append_path(context_path, work_index);
                 match find_src(&sources, &workspace, new_hash, work_index) {
                     Some(fi) => {
-                        if fi < work_index {
+                        if  find_target(&targets, &workspace, work_index, fi) {
+                            updates.push(Hunk { path, value: HunkAction::Swap(DocIndex::Idx(fi)) });
+                            workspace.swap(work_index, fi);
+                        } else {
+                            for _ in work_index..fi {
+                                updates.push(Hunk { path: path.clone(), value: HunkAction::Remove });
+                                workspace.remove(work_index);
+                            }
+                        }
+                    }
+                    None => match placed(work_index) {
+                        // the old element here is wanted further on: the copy goes in before
+                        // it; one not wanted is updated instead, not cloned then removed
+                        Some(fi) if targets.get(&work_item.hash).is_some_and(|v| v.iter().any(|&i| i > work_index)) => {
                             updates.push(Hunk { path, value: HunkAction::Clone(DocIndex::Idx(fi)) });
                             let r = Rc::new(RefCell::new(Idx::new(work_index, new_hash)));
                             sources.entry(new_hash).or_insert_with(Vec::new).push(Rc::downgrade(&r));
                             workspace.insert(work_index, r);
-                        } else {
-                            if  find_target(&targets, &workspace, work_index, fi) {
-                                updates.push(Hunk { path, value: HunkAction::Swap(DocIndex::Idx(fi)) });
-                                workspace.swap(work_index, fi);
-                            } else {
-                                for _ in work_index..fi {
-                                    updates.push(Hunk { path: path.clone(), value: HunkAction::Remove });
-                                    workspace.remove(work_index);
-                                }
-                            }
                         }
-                    }
-                    None => {
-                        if work_index < old.len() {
-                            debug_assert!(workspace.len() > work_index);
-                            compare_apply(&old[work_item.original_idx], new_value, new_hash, path,
-                                          &mut updates, &mut workspace, &mut sources, work_index);
-                        } else {
-                            updates.push(Hunk { path, value: HunkAction::Insert(new_value.clone()) });
-                        }
-
+                        // the elements from work_index on are old ones: a clone goes in at
+                        // the one being compared, and is passed
+                        _ => compare_apply(&old[work_item.original_idx], new_value, new_hash, path,
+                                           &mut updates, &mut workspace, &mut sources, work_index),
                     }
                 }
             } // on else - no actions needed, same value
@@ -334,6 +341,51 @@ mod tests {
                 assert_eq!(diffs[2], Hunk{path:vec![DocIndex::Idx(3)], value: HunkAction::Remove});
             }
         }
+    }
+
+    fn vec_diff(old: serde_json::Value, new: serde_json::Value) -> (Vec<Hunk>, GenericValue, GenericValue) {
+        let (old, new): (GenericValue, GenericValue) = (serde_json::from_value(old).unwrap(), serde_json::from_value(new).unwrap());
+        let (GenericValue::Array(o), GenericValue::Array(n)) = (&old, &new) else { panic!() };
+        (compute_vec_diff(o, n, &vec![]), old, new)
+    }
+
+    /// the diff's hunks, applied, make the new array
+    fn applies(diffs: &[Hunk], old: &GenericValue, new: &GenericValue) {
+        let patch: Mismatch = serde_json::from_value(serde_json::to_value(diffs).unwrap()).unwrap();
+        let mut doc = old.clone();
+        assert!(patch.apply_mut(&mut doc, true).unwrap().is_empty());
+        assert_eq!(&doc, new);
+    }
+
+    /// a copy of an element already in place, in the middle: a Clone of it, with no
+    /// value sent, and the old elements after it kept
+    #[test]
+    fn test_compute_vec_diff_clone_mid() {
+        let (diffs, old, new) = vec_diff(json!(["a", {"big": [1, 2, 3]}, "c"]), json!(["a", {"big": [1, 2, 3]}, {"big": [1, 2, 3]}, "c"]));
+        assert_eq!(diffs, vec![Hunk{path: vec![DocIndex::Idx(2)], value: HunkAction::Clone(DocIndex::Idx(1))}]);
+        applies(&diffs, &old, &new);
+    }
+
+    /// at the end, a copy is a Clone too, of the first equal one
+    #[test]
+    fn test_compute_vec_diff_clone_tail() {
+        let (diffs, old, new) = vec_diff(json!(["a", "b"]), json!(["a", "b", "a", "b", "x"]));
+        assert_eq!(diffs, vec![
+            Hunk{path: vec![DocIndex::Idx(2)], value: HunkAction::Clone(DocIndex::Idx(0))},
+            Hunk{path: vec![DocIndex::Idx(3)], value: HunkAction::Clone(DocIndex::Idx(1))},
+            Hunk{path: vec![DocIndex::Idx(4)], value: HunkAction::Insert(GenericValue::StringValue("x".into()))},
+        ]);
+        applies(&diffs, &old, &new);
+    }
+
+    /// an old element no longer wanted is updated to the copy, not kept by a Clone and
+    /// removed after
+    #[test]
+    fn test_compute_vec_diff_clone_not_over_update() {
+        let (diffs, old, new) = vec_diff(json!(["a", "b", "c"]), json!(["a", "b", "b"]));
+        assert_eq!(diffs.len(), 1, "{:?}", diffs);
+        assert!(matches!(diffs[0].value, HunkAction::UpdateTxt(_)), "{:?}", diffs);
+        applies(&diffs, &old, &new);
     }
 
     #[test]

@@ -1,0 +1,7 @@
+<config env="prod">
+  <name>api</name>
+  <port>9090</port>
+  <tag>auth</tag>
+  <tag>metrics</tag>
+  <tag>tracing</tag>
+</config>

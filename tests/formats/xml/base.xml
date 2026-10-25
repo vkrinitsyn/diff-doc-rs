@@ -1,0 +1,6 @@
+<config env="prod">
+  <name>api</name>
+  <port>8080</port>
+  <tag>auth</tag>
+  <tag>metrics</tag>
+</config>

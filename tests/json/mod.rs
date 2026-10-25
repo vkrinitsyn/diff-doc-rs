@@ -57,3 +57,52 @@ fn test_case3() {
 
 
 
+
+/// case `id`: with a result, A and B do not intersect, and Base + A + B = Base + B + A =
+/// result; without one, they intersect
+fn check(id: usize) {
+    let base = read_json(id, "base");
+    let pa = Mismatch::new(&base, &read_json(id, "a")).unwrap();
+    let pb = Mismatch::new(&base, &read_json(id, "b")).unwrap();
+    println!("#{} A: {:?}\n#{} B: {:?}", id, pa, id, pb);
+    let x = (pa.is_intersect(&pb).unwrap(), pb.is_intersect(&pa).unwrap());
+    if !std::path::Path::new(&format!("tests/json/case{}/result.json", id)).exists() {
+        assert_eq!(x, (true, true), "#{} intersect\nA: {:?}\nB: {:?}", id, pa, pb);
+        return;
+    }
+    assert_eq!(x, (false, false), "#{} intersect\nA: {:?}\nB: {:?}", id, pa, pb);
+    let result = read_json(id, "result");
+    for (first, second) in [(&pa, &pb), (&pb, &pa)] {
+        let mut doc = base.clone();
+        assert!(first.apply_mut(&mut doc, true).unwrap().is_empty());
+        assert!(second.apply_mut(&mut doc, true).unwrap().is_empty());
+        assert_eq!(doc, result, "#{}\n{}", id, to_yaml(&doc).unwrap());
+    }
+}
+
+#[test] /// map keys added and removed, values of other types
+fn test_case4() { check(4); }
+
+#[test] /// multi-line strings, a line of each changed
+fn test_case5() { check(5); }
+
+#[test] /// array elements swapped, a map changed
+fn test_case6() { check(6); }
+
+#[test] /// an array element copied in before the last: a Clone, another key changed
+fn test_case7() { check(7); }
+
+#[test] /// intersect: a node removed, changed inside by the other
+fn test_case8() { check(8); }
+
+#[test] /// intersect: a swap's other element updated
+fn test_case9() { check(9); }
+
+#[test] /// intersect: elements swapped, one changed inside by the other
+fn test_case10() { check(10); }
+
+#[test] /// intersect: a swap, an element removed between the swapped
+fn test_case11() { check(11); }
+
+#[test] /// intersect: one value, two updates
+fn test_case12() { check(12); }

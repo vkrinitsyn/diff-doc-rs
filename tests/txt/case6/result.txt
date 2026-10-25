@@ -1,0 +1,10 @@
+line one
+line 2 of the text, long enough for an inline append
+line 3 of the text, long enough for an inline append
+line 4 of the text (edited), long enough for an inline append
+line 5 of the text, long enough for an inline append
+line 6 of the text, long enough for an inline append
+line 7 of the text, long enough for an inline append
+line 8 of the text, long enough for an inline append
+line 9 of the text, long enough for an inline append
+line 10 of the text, long enough for an inline append

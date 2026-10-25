@@ -1,0 +1,212 @@
+# [i18n] diff_doc's messages: src/i18n.rs. Each in every language - en, ru, and, not
+# reviewed, fr, de, zh (Simplified Chinese), ja. An error starts with its code, DD-Ennn,
+# the same in every language.
+_version: 2
+
+# a document's changes - diff.rs
+doc.path_not_found:
+  en: "DD-E001 path not found: %{path}"
+  ru: "DD-E001 путь не найден: %{path}"
+  fr: "DD-E001 chemin introuvable : %{path}"
+  de: "DD-E001 Pfad nicht gefunden: %{path}"
+  zh: "DD-E001 未找到路径：%{path}"
+  ja: "DD-E001 パスが見つかりません：%{path}"
+doc.not_a_string:
+  en: "DD-E002 expected a string at %{path}"
+  ru: "DD-E002 ожидалась строка в %{path}"
+  fr: "DD-E002 chaîne attendue à %{path}"
+  de: "DD-E002 Zeichenkette erwartet bei %{path}"
+  zh: "DD-E002 %{path} 处应为字符串"
+  ja: "DD-E002 %{path} には文字列が必要です"
+doc.index_mismatch:
+  en: "DD-E003 index %{index} is of the wrong type: a map takes a name, an array a number"
+  ru: "DD-E003 индекс %{index} неверного типа: у словаря индекс - имя, у массива - число"
+  fr: "DD-E003 l'index %{index} n'est pas du bon type : une table prend un nom, un tableau un nombre"
+  de: "DD-E003 Index %{index} hat den falschen Typ: eine Map nimmt einen Namen, ein Array eine Zahl"
+  zh: "DD-E003 索引 %{index} 类型错误：映射使用名称，数组使用数字"
+  ja: "DD-E003 インデックス %{index} の型が違います：マップは名前、配列は数値を使います"
+doc.not_a_map:
+  en: "DD-E004 no map to find %{path} in"
+  ru: "DD-E004 нет словаря, в котором искать %{path}"
+  fr: "DD-E004 aucune table où chercher %{path}"
+  de: "DD-E004 keine Map, in der %{path} gesucht werden kann"
+  zh: "DD-E004 没有可查找 %{path} 的映射"
+  ja: "DD-E004 %{path} を探すマップがありません"
+doc.not_an_array:
+  en: "DD-E005 no array to find index %{path} in"
+  ru: "DD-E005 нет массива, в котором искать индекс %{path}"
+  fr: "DD-E005 aucun tableau où chercher l'index %{path}"
+  de: "DD-E005 kein Array, in dem Index %{path} gesucht werden kann"
+  zh: "DD-E005 没有可查找索引 %{path} 的数组"
+  ja: "DD-E005 インデックス %{path} を探す配列がありません"
+
+# a text's changes - txt.rs
+txt.remove_out_of_bounds:
+  en: "DD-E101 remove: line %{index} out of bounds %{len}"
+  ru: "DD-E101 удаление: строка %{index} вне границ %{len}"
+  fr: "DD-E101 suppression : ligne %{index} hors limites %{len}"
+  de: "DD-E101 Entfernen: Zeile %{index} außerhalb der Grenzen %{len}"
+  zh: "DD-E101 删除：第 %{index} 行超出范围 %{len}"
+  ja: "DD-E101 削除：行 %{index} が範囲外です（%{len}）"
+txt.insert_out_of_bounds:
+  en: "DD-E102 insert: line %{index} out of bounds %{len}"
+  ru: "DD-E102 вставка: строка %{index} вне границ %{len}"
+  fr: "DD-E102 insertion : ligne %{index} hors limites %{len}"
+  de: "DD-E102 Einfügen: Zeile %{index} außerhalb der Grenzen %{len}"
+  zh: "DD-E102 插入：第 %{index} 行超出范围 %{len}"
+  ja: "DD-E102 挿入：行 %{index} が範囲外です（%{len}）"
+txt.update_out_of_bounds:
+  en: "DD-E103 update: line %{index} out of bounds %{len}"
+  ru: "DD-E103 изменение: строка %{index} вне границ %{len}"
+  fr: "DD-E103 modification : ligne %{index} hors limites %{len}"
+  de: "DD-E103 Ändern: Zeile %{index} außerhalb der Grenzen %{len}"
+  zh: "DD-E103 更新：第 %{index} 行超出范围 %{len}"
+  ja: "DD-E103 更新：行 %{index} が範囲外です（%{len}）"
+txt.append_out_of_bounds:
+  en: "DD-E104 append: line %{index} out of bounds %{len}"
+  ru: "DD-E104 дописывание: строка %{index} вне границ %{len}"
+  fr: "DD-E104 ajout : ligne %{index} hors limites %{len}"
+  de: "DD-E104 Anhängen: Zeile %{index} außerhalb der Grenzen %{len}"
+  zh: "DD-E104 追加：第 %{index} 行超出范围 %{len}"
+  ja: "DD-E104 追記：行 %{index} が範囲外です（%{len}）"
+txt.append_pos_out_of_bounds:
+  en: "DD-E105 append: position %{pos} out of bounds in line %{line} (length %{len})"
+  ru: "DD-E105 дописывание: позиция %{pos} вне границ строки %{line} (длина %{len})"
+  fr: "DD-E105 ajout : position %{pos} hors limites dans la ligne %{line} (longueur %{len})"
+  de: "DD-E105 Anhängen: Position %{pos} außerhalb der Grenzen in Zeile %{line} (Länge %{len})"
+  zh: "DD-E105 追加：位置 %{pos} 超出第 %{line} 行的范围（长度 %{len}）"
+  ja: "DD-E105 追記：位置 %{pos} が行 %{line} の範囲外です（長さ %{len}）"
+txt.append_eol:
+  en: "DD-E106 append: the text added to line %{line} contains an end of line"
+  ru: "DD-E106 дописывание: текст, добавляемый в строку %{line}, содержит конец строки"
+  fr: "DD-E106 ajout : le texte ajouté à la ligne %{line} contient une fin de ligne"
+  de: "DD-E106 Anhängen: der an Zeile %{line} angehängte Text enthält ein Zeilenende"
+  zh: "DD-E106 追加：添加到第 %{line} 行的文本包含换行符"
+  ja: "DD-E106 追記：行 %{line} に追加するテキストに改行が含まれています"
+
+# a GNU patch - patch.rs
+patch.parse:
+  en: "DD-E201 patch does not parse: %{err}"
+  ru: "DD-E201 патч не разобран: %{err}"
+  fr: "DD-E201 analyse du patch impossible : %{err}"
+  de: "DD-E201 Patch nicht lesbar: %{err}"
+  zh: "DD-E201 无法解析补丁：%{err}"
+  ja: "DD-E201 パッチを解析できません：%{err}"
+patch.apply:
+  en: "DD-E202 patch hunk %{hunk} does not apply: its lines are not in the text"
+  ru: "DD-E202 фрагмент патча %{hunk} не применяется: его строк нет в тексте"
+  fr: "DD-E202 le fragment %{hunk} du patch ne s'applique pas : ses lignes ne sont pas dans le texte"
+  de: "DD-E202 Patch-Abschnitt %{hunk} nicht anwendbar: seine Zeilen fehlen im Text"
+  zh: "DD-E202 无法应用补丁块 %{hunk}：文本中没有它的行"
+  ja: "DD-E202 パッチのハンク %{hunk} を適用できません：その行がテキストにありません"
+
+# a number's value - generic.rs's NumericString
+generic.not_a_number:
+  en: "DD-E301 string is not a valid number"
+  ru: "DD-E301 строка не является допустимым числом"
+  fr: "DD-E301 la chaîne n'est pas un nombre valide"
+  de: "DD-E301 Zeichenkette ist keine gültige Zahl"
+  zh: "DD-E301 字符串不是有效的数字"
+  ja: "DD-E301 文字列が有効な数値ではありません"
+generic.not_numeric:
+  en: "DD-E302 data is neither a number nor a string"
+  ru: "DD-E302 данные не являются ни числом, ни строкой"
+  fr: "DD-E302 la donnée n'est ni un nombre ni une chaîne"
+  de: "DD-E302 Daten sind weder Zahl noch Zeichenkette"
+  zh: "DD-E302 数据既不是数字也不是字符串"
+  ja: "DD-E302 データが数値でも文字列でもありません"
+
+# an XML document - xml.rs
+xml.root:
+  en: "DD-E401 XML has one root element: a map of one key, its value not an array"
+  ru: "DD-E401 у XML один корневой элемент: словарь с одним ключом, значение которого не массив"
+  fr: "DD-E401 un XML a un seul élément racine : une table d'une clé, dont la valeur n'est pas un tableau"
+  de: "DD-E401 XML hat ein Wurzelelement: eine Map mit einem Schlüssel, deren Wert kein Array ist"
+  zh: "DD-E401 XML 只有一个根元素：只有一个键的映射，其值不是数组"
+  ja: "DD-E401 XML のルート要素は一つです：キーが一つのマップで、その値は配列ではありません"
+xml.name:
+  en: "DD-E402 not an XML name: %{name}, at %{at}"
+  ru: "DD-E402 недопустимое имя XML: %{name}, в %{at}"
+  fr: "DD-E402 nom XML invalide : %{name}, à %{at}"
+  de: "DD-E402 kein XML-Name: %{name}, bei %{at}"
+  zh: "DD-E402 不是 XML 名称：%{name}，位于 %{at}"
+  ja: "DD-E402 XML の名前ではありません：%{name}（%{at}）"
+xml.array_in_array:
+  en: "DD-E403 an array in an array has no XML form, at %{at}"
+  ru: "DD-E403 массив в массиве не выражается в XML, в %{at}"
+  fr: "DD-E403 un tableau dans un tableau n'a pas de forme XML, à %{at}"
+  de: "DD-E403 ein Array in einem Array hat keine XML-Form, bei %{at}"
+  zh: "DD-E403 数组中的数组无法表示为 XML，位于 %{at}"
+  ja: "DD-E403 配列の中の配列は XML で表せません（%{at}）"
+xml.attribute:
+  en: "DD-E404 attribute %{name} at %{at} has more than one value"
+  ru: "DD-E404 у атрибута %{name} в %{at} больше одного значения"
+  fr: "DD-E404 l'attribut %{name} à %{at} a plus d'une valeur"
+  de: "DD-E404 Attribut %{name} bei %{at} hat mehr als einen Wert"
+  zh: "DD-E404 位于 %{at} 的属性 %{name} 有多个值"
+  ja: "DD-E404 %{at} の属性 %{name} に複数の値があります"
+
+# where two patches intersect, not an error: Intersection's - intersection.rs
+intersect.inside:
+  en: "DD-I001 change %{a} of A and change %{b} of B: one changes the node %{at}, the other inside it"
+  ru: "DD-I001 изменение %{a} из A и изменение %{b} из B: одно меняет узел %{at}, другое - внутри него"
+  fr: "DD-I001 changement %{a} de A et changement %{b} de B : l'un change le nœud %{at}, l'autre son contenu"
+  de: "DD-I001 Änderung %{a} von A und Änderung %{b} von B: eine ändert den Knoten %{at}, die andere darin"
+  zh: "DD-I001 A 的第 %{a} 项更改与 B 的第 %{b} 项更改：一个更改节点 %{at}，另一个更改其内部"
+  ja: "DD-I001 A の変更 %{a} と B の変更 %{b}：一方がノード %{at} を、もう一方がその内部を変更します"
+intersect.other_element:
+  en: "DD-I002 change %{a} of A and change %{b} of B: a swap or clone reads the element %{at} the other changes"
+  ru: "DD-I002 изменение %{a} из A и изменение %{b} из B: перестановка или копирование читает элемент %{at}, который меняет другое"
+  fr: "DD-I002 changement %{a} de A et changement %{b} de B : un échange ou une copie lit l'élément %{at} que l'autre change"
+  de: "DD-I002 Änderung %{a} von A und Änderung %{b} von B: ein Tausch oder eine Kopie liest das Element %{at}, das die andere ändert"
+  zh: "DD-I002 A 的第 %{a} 项更改与 B 的第 %{b} 项更改：交换或复制读取了另一方更改的元素 %{at}"
+  ja: "DD-I002 A の変更 %{a} と B の変更 %{b}：入れ替えまたは複製が、もう一方の変更する要素 %{at} を読みます"
+intersect.same_node:
+  en: "DD-I003 change %{a} of A and change %{b} of B change %{at} differently"
+  ru: "DD-I003 изменение %{a} из A и изменение %{b} из B по-разному меняют %{at}"
+  fr: "DD-I003 changement %{a} de A et changement %{b} de B changent %{at} différemment"
+  de: "DD-I003 Änderung %{a} von A und Änderung %{b} von B ändern %{at} unterschiedlich"
+  zh: "DD-I003 A 的第 %{a} 项更改与 B 的第 %{b} 项更改以不同方式更改 %{at}"
+  ja: "DD-I003 A の変更 %{a} と B の変更 %{b} が %{at} を異なる値に変更します"
+intersect.array_shift:
+  en: "DD-I004 change %{a} of A and change %{b} of B: an element removed or inserted in the array %{at} moves the other's"
+  ru: "DD-I004 изменение %{a} из A и изменение %{b} из B: элемент, удалённый или вставленный в массив %{at}, сдвигает элемент другого"
+  fr: "DD-I004 changement %{a} de A et changement %{b} de B : un élément supprimé ou inséré dans le tableau %{at} déplace celui de l'autre"
+  de: "DD-I004 Änderung %{a} von A und Änderung %{b} von B: ein im Array %{at} entferntes oder eingefügtes Element verschiebt das der anderen"
+  zh: "DD-I004 A 的第 %{a} 项更改与 B 的第 %{b} 项更改：在数组 %{at} 中删除或插入的元素移动了另一方的元素"
+  ja: "DD-I004 A の変更 %{a} と B の変更 %{b}：配列 %{at} で削除または挿入された要素が、もう一方の要素の位置をずらします"
+intersect.node_kind:
+  en: "DD-I005 change %{a} of A and change %{b} of B: one takes %{at} as a map, the other as an array"
+  ru: "DD-I005 изменение %{a} из A и изменение %{b} из B: одно считает %{at} словарём, другое - массивом"
+  fr: "DD-I005 changement %{a} de A et changement %{b} de B : l'un prend %{at} pour une table, l'autre pour un tableau"
+  de: "DD-I005 Änderung %{a} von A und Änderung %{b} von B: eine nimmt %{at} als Map, die andere als Array"
+  zh: "DD-I005 A 的第 %{a} 项更改与 B 的第 %{b} 项更改：一个把 %{at} 当作映射，另一个当作数组"
+  ja: "DD-I005 A の変更 %{a} と B の変更 %{b}：一方は %{at} をマップ、もう一方は配列として扱います"
+intersect.both_move_lines:
+  en: "DD-I006 change %{a} of A and change %{b} of B both remove or insert lines: each moves the other's lines, from line %{at}"
+  ru: "DD-I006 изменение %{a} из A и изменение %{b} из B оба удаляют или вставляют строки: каждое сдвигает строки другого, начиная со строки %{at}"
+  fr: "DD-I006 changement %{a} de A et changement %{b} de B suppriment ou insèrent tous deux des lignes : chacun déplace celles de l'autre, dès la ligne %{at}"
+  de: "DD-I006 Änderung %{a} von A und Änderung %{b} von B entfernen oder fügen beide Zeilen ein: jede verschiebt die der anderen, ab Zeile %{at}"
+  zh: "DD-I006 A 的第 %{a} 项更改与 B 的第 %{b} 项更改都删除或插入行：从第 %{at} 行起，各自移动了另一方的行"
+  ja: "DD-I006 A の変更 %{a} と B の変更 %{b} はどちらも行を削除または挿入します：行 %{at} 以降、互いの行をずらします"
+intersect.line_moved:
+  en: "DD-I007 change %{a} of A and change %{b} of B: a line removed or inserted at line %{at} moves the other's line"
+  ru: "DD-I007 изменение %{a} из A и изменение %{b} из B: строка, удалённая или вставленная в строке %{at}, сдвигает строку другого"
+  fr: "DD-I007 changement %{a} de A et changement %{b} de B : une ligne supprimée ou insérée à la ligne %{at} déplace celle de l'autre"
+  de: "DD-I007 Änderung %{a} von A und Änderung %{b} von B: eine bei Zeile %{at} entfernte oder eingefügte Zeile verschiebt die der anderen"
+  zh: "DD-I007 A 的第 %{a} 项更改与 B 的第 %{b} 项更改：在第 %{at} 行删除或插入的行移动了另一方的行"
+  ja: "DD-I007 A の変更 %{a} と B の変更 %{b}：行 %{at} で削除または挿入された行が、もう一方の行をずらします"
+intersect.same_line:
+  en: "DD-I008 change %{a} of A and change %{b} of B change line %{at} differently"
+  ru: "DD-I008 изменение %{a} из A и изменение %{b} из B по-разному меняют строку %{at}"
+  fr: "DD-I008 changement %{a} de A et changement %{b} de B changent la ligne %{at} différemment"
+  de: "DD-I008 Änderung %{a} von A und Änderung %{b} von B ändern Zeile %{at} unterschiedlich"
+  zh: "DD-I008 A 的第 %{a} 项更改与 B 的第 %{b} 项更改以不同方式更改第 %{at} 行"
+  ja: "DD-I008 A の変更 %{a} と B の変更 %{b} が行 %{at} を異なる内容に変更します"
+intersect.hunks_overlap:
+  en: "DD-I009 hunk %{a} of A and hunk %{b} of B read the same lines %{at}: each needs them as they were"
+  ru: "DD-I009 фрагмент %{a} из A и фрагмент %{b} из B читают одни строки %{at}: каждому они нужны неизменными"
+  fr: "DD-I009 le fragment %{a} de A et le fragment %{b} de B lisent les mêmes lignes %{at} : chacun en a besoin telles qu'elles étaient"
+  de: "DD-I009 Abschnitt %{a} von A und Abschnitt %{b} von B lesen dieselben Zeilen %{at}: jeder braucht sie unverändert"
+  zh: "DD-I009 A 的第 %{a} 个补丁块与 B 的第 %{b} 个补丁块读取相同的行 %{at}：各自都需要它们保持原样"
+  ja: "DD-I009 A のハンク %{a} と B のハンク %{b} は同じ行 %{at} を読みます：どちらもそれらが元のままである必要があります"

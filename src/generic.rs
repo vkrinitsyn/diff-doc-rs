@@ -237,8 +237,10 @@ pub fn from_toml(s: &str) -> Result<GenericValue, toml::de::Error> {
     toml::from_str(s)
 }
 
-pub fn from_xml(s: &str) -> Result<GenericValue, serde_xml_rs::Error> {
-    serde_xml_rs::from_str(s)
+/// XML as this crate maps it - see xml.rs: attributes as `@name`, a repeated element
+/// as an array, text beside elements as `$text`
+pub fn from_xml(s: &str) -> Result<GenericValue, roxmltree::Error> {
+    crate::xml::from_xml(s)
 }
 
 // --- Serialization Functions ---
@@ -254,8 +256,14 @@ pub fn to_toml(value: &GenericValue) -> Result<String, toml::ser::Error> {
     toml::to_string_pretty(value)
 }
 
-pub fn to_xml(value: &GenericValue) -> Result<String, serde_xml_rs::Error> {
-    serde_xml_rs::to_string(value)
+/// a map of one key, the root element - see xml.rs
+pub fn to_xml(value: &GenericValue) -> Result<String, crate::DocError> {
+    crate::xml::to_xml(value)
+}
+
+/// a string a number is read from: an integer or a float
+pub(crate) fn is_numeric(s: &str) -> bool {
+    s.parse::<u128>().is_ok() || s.parse::<i128>().is_ok() || s.parse::<f64>().is_ok()
 }
 
 
@@ -305,20 +313,15 @@ impl<'de> Deserialize<'de> for NumericString {
             Value::Number(num) => num.to_string(),
             // If the value is a string, check if it's a valid number.
             Value::String(s) => {
-                if s.parse::<u128>().is_ok()
-                || s.parse::<i128>().is_ok()
-                || s.parse::<f64>().is_ok()
-                {
+                if is_numeric(&s) {
                     s
                 } else {
-                    return Err(serde::de::Error::custom("string is not a valid number"));
+                    return Err(serde::de::Error::custom(tr!("generic.not_a_number")));
                 }
             }
             // For any other type, return an error.
             _ => {
-                return Err(serde::de::Error::custom(
-                    "data did not match any numeric or string variant"
-                ));
+                return Err(serde::de::Error::custom(tr!("generic.not_numeric")));
             }
         };
 

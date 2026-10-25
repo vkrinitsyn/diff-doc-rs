@@ -1,0 +1,7 @@
+service:
+  name: api
+  port: 9090
+  replicas: 2
+features:
+  - auth
+  - metrics

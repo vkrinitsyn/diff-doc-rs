@@ -2,7 +2,7 @@ use std::cmp::{max, min};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use serde::{Deserialize, Serialize};
-use crate::{txt, DocError, MismatchDoc, MismatchDocCow, MismatchDocMut};
+use crate::{txt, DocError, Intersection, MismatchDoc, MismatchDocCow, MismatchDocMut, Reason};
 
 use crate::generic::{DocIndex, GenericValue, Hunk, HunkAction};
 use crate::vec_processor::Range;
@@ -45,11 +45,11 @@ impl Hunk {
                                 }
                                 HunkAction::UpdateTxt(v) => {
                                     if let GenericValue::StringValue(s) = m.get(p)
-                                            .ok_or_else(|| DocError::new(format!("Path not found: {}", p)))? {
+                                            .ok_or_else(|| DocError::PathNotFound { path: DocIndex::Name(p.clone()) })? {
                                         let new_v = txt::Mismatch(v.clone()).apply(s)?;
                                         m.insert(p.clone(),  GenericValue::StringValue(new_v));
                                     } else {
-                                        return Err(DocError::new(format!("Expected string: {}", p)));
+                                        return Err(DocError::NotAString { path: DocIndex::Name(p.clone()) });
                                     }
                                 }
                                 HunkAction::Insert(v) => {
@@ -58,7 +58,7 @@ impl Hunk {
                                 HunkAction::Swap(v)
                                 | HunkAction::Clone(v) => {
                                     if let DocIndex::Name(vv) = v {
-                                        let a = m.get(vv).ok_or_else(|| DocError::new(format!("Path not found: {}", p)))?;
+                                        let a = m.get(vv).ok_or_else(|| DocError::PathNotFound { path: DocIndex::Name(vv.clone()) })?;
                                         let x= m.insert(p.clone(), a.clone());
                                         if matches!(&self.value, HunkAction::Swap(_)) {
                                             if let Some(x) = x {
@@ -68,17 +68,17 @@ impl Hunk {
                                             }
                                         }
                                     } else {
-                                        return Err(DocError::new(format!("index type must match: {:?}", v)));
+                                        return Err(DocError::IndexMismatch { index: v.clone() });
                                     }
                                 }
                             }
                             return Ok(());
                         } else {
-                            m.get_mut(p).ok_or_else(|| DocError::new(format!("Path not found: {}", p)))?
+                            m.get_mut(p).ok_or_else(|| DocError::PathNotFound { path: DocIndex::Name(p.clone()) })?
                         }
 
                     } else {
-                        return Err(DocError::new(format!("Path index not found: {}", p)));
+                        return Err(DocError::NotAContainer { path: path.clone() });
                     }
                 }
                 DocIndex::Idx(p) => {
@@ -93,11 +93,11 @@ impl Hunk {
                                 }
                                 HunkAction::UpdateTxt(v) => {
                                     if let GenericValue::StringValue(s) = m.get(*p)
-                                            .ok_or_else(|| DocError::new(format!("Path not found: {}", p)))? {
+                                            .ok_or_else(|| DocError::PathNotFound { path: DocIndex::Idx(*p) })? {
                                         let new_v = txt::Mismatch(v.clone()).apply(s)?;
                                         m[*p] = GenericValue::StringValue(new_v);
                                     } else {
-                                        return Err(DocError::new(format!("Expected string field: {}", p)));
+                                        return Err(DocError::NotAString { path: DocIndex::Idx(*p) });
                                     }
                                 }
                                 HunkAction::Insert(v) => {
@@ -107,23 +107,23 @@ impl Hunk {
                                     if let DocIndex::Idx(vv) = v {
                                         swap(m, p, vv);
                                     } else {
-                                        return Err(DocError::new(format!("index type must match: {:?}", v)));
+                                        return Err(DocError::IndexMismatch { index: v.clone() });
                                     }
                                 }
                                 HunkAction::Clone(v) => {
                                     if let DocIndex::Idx(vv) = v {
                                         copy(m, *p, *vv);
                                     } else {
-                                        return Err(DocError::new(format!("index type must match: {:?}", v)));
+                                        return Err(DocError::IndexMismatch { index: v.clone() });
                                     }
                                 }
                             }
                             return Ok(());
                         } else {
-                            m.get_mut(*p).ok_or_else(|| DocError::new(format!("Path not found: {}", p)))?
+                            m.get_mut(*p).ok_or_else(|| DocError::PathNotFound { path: DocIndex::Idx(*p) })?
                         }
                     } else {
-                        return Err(DocError::new(format!("Path index not found: {}", p)));
+                        return Err(DocError::NotAContainer { path: path.clone() });
                     }
                 }
             };
@@ -164,24 +164,22 @@ impl MismatchDoc<GenericValue> for Mismatch {
         Ok(Mismatch(GenericValue::diff(base, &input, &vec![])))
     }
 
-    fn is_intersect(&self, input: &Self) -> Result<bool, DocError> {
+    fn intersections(&self, input: &Self) -> Result<Vec<Intersection>, DocError> {
 
         let ranges_a = PathRange::new(&self.0);
         let ranges_b = PathRange::new(&input.0);
 
-        for a in &self.0 {
-            for b in &input.0 {
-                if is_intersect(a, &ranges_a, b, &ranges_b, #[cfg(debug_assertions)] "a~b") {
-                    return Ok(true);
-                }
-
-                if is_intersect(b, &ranges_b, a, &ranges_a, #[cfg(debug_assertions)] "b~a") {
-                    return Ok(true);
+        let mut found = Vec::new();
+        for (i, a) in self.0.iter().enumerate() {
+            for (j, b) in input.0.iter().enumerate() {
+                if let Some((reason, at)) = is_intersect(a, &ranges_a, b, &ranges_b, "a~b")
+                    .or_else(|| is_intersect(b, &ranges_b, a, &ranges_a, "b~a")) {
+                    found.push(Intersection { a: i, b: j, reason, at: pointer(&at) });
                 }
             }
         }
 
-        Ok(false)
+        Ok(found)
     }
 
     fn len(&self) -> usize {
@@ -262,10 +260,32 @@ impl PathRange {
 
 }
 
-/// check for intersection of two patches by path for update or delete of documents including vec/array
-fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapType, #[cfg(debug_assertions)] _msg: &str) -> bool {
+/// a path as a JSON pointer (RFC 6901): `/list/2/name`
+fn pointer(path: &[DocIndex]) -> String {
+    path.iter().map(|p| match p {
+        DocIndex::Name(n) => format!("/{}", n.replace('~', "~0").replace('/', "~1")),
+        DocIndex::Idx(i) => format!("/{}", i),
+    }).collect()
+}
+
+/// check for intersection of two patches by path for update or delete of documents including vec/array:
+/// why, and the path where
+fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapType, _msg: &str) -> Option<(Reason, Vec<DocIndex>)> {
     if a.path.len() == 0 || b.path.len() == 0 {
-        return false; // assert no changes
+        return None; // assert no changes
+    }
+
+    // a change to a node is one to all inside it; a Swap or Clone reads its other
+    // element too (b's in a's: the other call)
+    for ta in touched(a) {
+        for tb in touched(b) {
+            if ta.len() < tb.len() && tb[..ta.len()] == ta[..] {
+                return Some((Reason::Inside, ta));
+            }
+            if ta == tb && (ta != a.path || tb != b.path) {
+                return Some((Reason::OtherElement, ta));
+            }
+        }
     }
 
     // this is a json path index, the longer path wont intersect with short one if longer do not contain the short
@@ -277,37 +297,50 @@ fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapTy
         if !cmp_val {
             if a.path[i] != b.path[i]
             {
-                return false; // diverged paths
+                return None; // diverged paths
             }
         }
 
-        if let Some(_cause) = is_intersect2(a, b, i, ranges_b) {
-            #[cfg(feature="verbose")] println!("is_intersect {_msg} upto {comp2idx} as step {i} of {comp2idx} by: {_cause}\nBase action: {a}\nInterfere with: {b}");
-            return true;
+        if let Some(cause) = is_intersect2(a, b, i, ranges_b) {
+            #[cfg(feature="verbose")] println!("is_intersect {_msg} upto {comp2idx} as step {i} of {comp2idx} by: {cause:?}\nBase action: {a}\nInterfere with: {b}");
+            return Some(cause);
         }
     }
 
-    // check ranges_a in ranges_b
-    for (k, v) in ranges_a {
-        if let Some(x) = ranges_b.get(k) {
-            for r in x {
-                for p in v {
-                    if p.range.overlap(&r.range) {
-                        #[cfg(feature="verbose")] println!("is_intersect {msg} as overlap {p:?} with {:?}", &r.range);
-                        return true;
-                    }
+    // check a's ranges in b's, of the array both are in
+    let key = PathKey(a.path.clone());
+    if let (Some(v), Some(x)) = (ranges_a.get(&key), ranges_b.get(&key)) {
+        for r in x {
+            for p in v {
+                if p.range.overlap(&r.range) {
+                    #[cfg(feature="verbose")] println!("is_intersect {_msg} as overlap {p:?} with {:?}", &r.range);
+                    return Some((Reason::ArrayShift, a.path[..a.path.len() - 1].to_vec()));
                 }
             }
         }
     }
-    false
+    None
+}
+
+/// the paths a hunk changes or reads: its own, and a Swap's or Clone's other element
+fn touched(h: &Hunk) -> Vec<Vec<DocIndex>> {
+    let mut paths = vec![h.path.clone()];
+    if let HunkAction::Swap(other) | HunkAction::Clone(other) = &h.value {
+        let mut p = h.path.clone();
+        if let Some(last) = p.last_mut() {
+            *last = other.clone();
+        }
+        paths.push(p);
+    }
+    paths
 }
 
 /// check for intersection of two patches by path for update or delete of documents including vec/array
-fn is_intersect2(a: &Hunk, b: &Hunk, idx: usize, ranges_b: &PathMapType) -> Option<&'static str> {
-    fn return_(cnd: bool, msg: &'static str) -> Option<&'static str> {
+/// - why, and the path where: the array an element moves in, the node changed otherwise
+fn is_intersect2(a: &Hunk, b: &Hunk, idx: usize, ranges_b: &PathMapType) -> Option<(Reason, Vec<DocIndex>)> {
+    fn return_(cnd: bool, reason: Reason) -> Option<Reason> {
         if cnd {
-            Some(msg)
+            Some(reason)
         } else {
             None
         }
@@ -319,113 +352,122 @@ fn is_intersect2(a: &Hunk, b: &Hunk, idx: usize, ranges_b: &PathMapType) -> Opti
             if let Some(ps) = ranges_b.get(&PathKey(a.path[..max(a.path.len() - 2, 0)].to_vec())) {
                 for p in ps {
                     if p.range.start < idx && p.range.end.unwrap_or(usize::MAX) > idx {
-                        return Some("overlap in ranges");
+                        return Some((Reason::ArrayShift, a.path[..a.path.len() - 1].to_vec()));
                     }
                 }
             }
         }
     }
     if a.path.len() == idx+1 || b.path.len() == idx+1 {
-        match &a.path[idx] {
+        let reason = match &a.path[idx] {
             DocIndex::Name(a_path) => {
                 match &b.path[idx] {
                     DocIndex::Name(b_path) =>
-                        return_(a_path == b_path && &a.value != &b.value, "diff values"),
+                        return_(a_path == b_path && &a.value != &b.value, Reason::SameNode),
                     DocIndex::Idx(_) =>
-                        return_(a.value != b.value, "discrepancy in types name-idx, but in case of delete - no matter"),
+                        return_(a.value != b.value, Reason::NodeKind),
                 }
             }
             DocIndex::Idx(a_idx) => {
                 match &b.path[idx] {
                     DocIndex::Name(_) =>
-                        return_(a.value != b.value, "discrepancy in types idx-name, but in case of delete - no matter"),
+                        return_(a.value != b.value, Reason::NodeKind),
                     DocIndex::Idx(b_idx) => {
                         match &a.value {
                             HunkAction::Remove => { // shift array left
                                 match &b.value {
                                     HunkAction::Remove =>
-                                        return_(a_idx != b_idx, "both removes with different indexes"),
-                                    _ => return_(a_idx < b_idx, "expected to remove but another lower index action found"),
+                                        return_(a_idx != b_idx, Reason::ArrayShift),
+                                    _ => return_(a_idx < b_idx, Reason::ArrayShift),
                                 }
                             }
-                            // shift array right
+                            // shift array right, from a_idx on: the other's element there
+                            // is the inserted one after, unless both insert it alike
                             HunkAction::Insert(a_val) => {
                                 match &b.value {
-                                    HunkAction::Insert(b_val) =>
-                                        return_(a_idx == b_idx && a_val != b_val, "both insert with different values"),
-                                    _ => return_(a_idx < b_idx, "expected to insert but another lower index action found"),
+                                    HunkAction::Insert(b_val) if a_idx == b_idx =>
+                                        return_(a_val != b_val, Reason::SameNode),
+                                    _ => return_(a_idx <= b_idx, Reason::ArrayShift),
                                 }
                             }
                             // shift array right
                             HunkAction::Clone(a_val) => {
                                 match &b.value {
-                                    HunkAction::Clone(b_val) =>
-                                        return_(a_idx == b_idx && a_val != b_val, "both clone with different values"),
-                                    _ => return_(a_idx < b_idx, "expected to clone but another lower index action found"),
+                                    HunkAction::Clone(b_val) if a_idx == b_idx =>
+                                        return_(a_val != b_val, Reason::SameNode),
+                                    _ => return_(a_idx <= b_idx, Reason::ArrayShift),
                                 }
                             }
                             // no shift actions below
                             HunkAction::Update(a_val) => {
                                 match &b.value {
                                     HunkAction::Update(b_val) =>
-                                        return_(a_idx == b_idx && a_val != b_val, "both update with different values"),
+                                        return_(a_idx == b_idx && a_val != b_val, Reason::SameNode),
                                     HunkAction::UpdateTxt(_) =>
-                                        return_(a_idx == b_idx, "update with other update txt"),
+                                        return_(a_idx == b_idx, Reason::SameNode),
                                     HunkAction::Swap(_) =>
-                                        return_(a_idx == b_idx, "update with other swap"),
+                                        return_(a_idx == b_idx, Reason::SameNode),
                                     // no shift compare to shift actions
                                     HunkAction::Remove =>
-                                        return_(a_idx > b_idx, "update with other remove at lower index"),
+                                        return_(a_idx > b_idx, Reason::ArrayShift),
                                     // shift array right
                                     HunkAction::Insert(_) =>
-                                        return_(a_idx > b_idx, "update with other insert at lower index"),
+                                        return_(a_idx > b_idx, Reason::ArrayShift),
                                     HunkAction::Clone(_) =>
-                                        return_(a_idx > b_idx, "update with other clone at lower index"),
+                                        return_(a_idx > b_idx, Reason::ArrayShift),
                                 }
                             }
                             // no shift
                             HunkAction::UpdateTxt(a_val) => {
                                 match &b.value {
                                     HunkAction::UpdateTxt(b_val) =>
-                                        return_(a_idx == b_idx && a_val != b_val, "both update with different values"),
+                                        return_(a_idx == b_idx && a_val != b_val, Reason::SameNode),
                                     HunkAction::Update(_) =>
-                                        return_(a_idx == b_idx, "update txt with other update"),
+                                        return_(a_idx == b_idx, Reason::SameNode),
                                     HunkAction::Swap(_) =>
-                                        return_(a_idx == b_idx, "update txt  with other swap"),
+                                        return_(a_idx == b_idx, Reason::SameNode),
                                     // no shift compare to shift actions
                                     HunkAction::Remove =>
-                                        return_(a_idx > b_idx, "update txt with other insert at lower index"),
+                                        return_(a_idx > b_idx, Reason::ArrayShift),
                                     // shift array right
                                     HunkAction::Insert(_) =>
-                                        return_(a_idx > b_idx, "update txt with other insert at lower index"),
+                                        return_(a_idx > b_idx, Reason::ArrayShift),
                                     HunkAction::Clone(_) =>
-                                        return_(a_idx > b_idx, "update txt with other clone at lower index"),
+                                        return_(a_idx > b_idx, Reason::ArrayShift),
                                 }
                             }
-                            // no shift
+                            // no shift; the elements of both indexes move with the other's shift
                             HunkAction::Swap(a_val) => {
+                                let a_idx = match a_val {
+                                    DocIndex::Idx(other) => max(a_idx, other),
+                                    DocIndex::Name(_) => a_idx,
+                                };
                                 match &b.value {
                                     HunkAction::Swap(b_val) =>
-                                        return_(a_idx == b_idx && a_val != b_val, "both swap with different values"),
+                                        return_(a_idx == b_idx && a_val != b_val, Reason::SameNode),
                                     HunkAction::UpdateTxt(_) =>
-                                        return_(a_idx == b_idx, "swap with other txt update"),
+                                        return_(a_idx == b_idx, Reason::SameNode),
                                     HunkAction::Update(_) =>
-                                        return_(a_idx == b_idx, "swap with other update"),
+                                        return_(a_idx == b_idx, Reason::SameNode),
                                     // no shift A, compare to shift B actions
                                     HunkAction::Remove =>
-                                        return_(a_idx > b_idx, "swap with other remove at lower index"),
+                                        return_(a_idx > b_idx, Reason::ArrayShift),
                                     // shift array right
                                     HunkAction::Insert(_) =>
-                                        return_(a_idx > b_idx, "swap with other insert at lower index"),
+                                        return_(a_idx > b_idx, Reason::ArrayShift),
                                     HunkAction::Clone(_) =>
-                                        return_(a_idx > b_idx, "swap with other clone at lower index"),
+                                        return_(a_idx > b_idx, Reason::ArrayShift),
                                 }
                             }
                         }
                     }
                 }
             }
-        }
+        };
+        reason.map(|r| match r {
+            Reason::ArrayShift => (r, a.path[..idx].to_vec()),
+            _ => (r, a.path[..=idx].to_vec()),
+        })
     } else {
         None // values are non-comparable path state
     }

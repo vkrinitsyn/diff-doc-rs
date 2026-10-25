@@ -1,0 +1,11 @@
+{
+  "name": "service",
+  "port": "8081",
+  "debug": true,
+  "tags": [
+    "web",
+    "api"
+  ],
+  "notes": "first line\nsecond line\nthird line\nfourth line",
+  "timeout": 30
+}

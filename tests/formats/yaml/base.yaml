@@ -1,0 +1,7 @@
+service:
+  name: api
+  port: 8080
+  replicas: 2
+features:
+  - auth
+  - metrics

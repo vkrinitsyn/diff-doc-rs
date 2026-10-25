@@ -1,5 +1,5 @@
 use std::fmt;
-use crate::{DocError, MismatchDoc, MismatchDocCow};
+use crate::{DocError, Intersection, LineOp, MismatchDoc, MismatchDocCow, Reason};
 
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Mismatch(pub Vec<DiffOp>);
@@ -20,12 +20,8 @@ pub enum DiffOp {
 
 impl DiffOp {
     /// Returns true if this operation shift left or right
-    fn _is_delete_insert(&self) -> bool {
-        match &self {
-            DiffOp::Remove{..} => true,
-            DiffOp::Insert{..} => true,
-            _ => false,
-        }
+    fn shifts(&self) -> bool {
+        matches!(self, DiffOp::Remove{..} | DiffOp::Insert{..})
     }
 
     fn index(&self) -> usize {
@@ -38,28 +34,11 @@ impl DiffOp {
     }
 
     /// Returns true if this operation does not match the other by index
-    /// i.e. if same index but different operation type OR update value, returns false
+    /// i.e. same line and other than the same update: two appends to a line move each
+    /// other's position, and a line removed or inserted is not the other's line
     fn unmatch(&self, other: &Self) -> bool {
         self.index() == other.index() &&
-        match &self {
-            DiffOp::Remove{..} => true,
-            DiffOp::Insert{value: a_v, ..} =>
-                match other {
-                    DiffOp::Insert{value: b_v, ..} => a_v != b_v,
-                    _ => true,
-                }
-            DiffOp::Update{value: a_v, ..} =>
-                match other {
-                    DiffOp::Update{value: b_v, ..} => a_v != b_v,
-                    _ => true,
-                }
-            DiffOp::Append{pos: a_p, value: a_v, ..} =>
-                match other {
-                    DiffOp::Append{pos: b_pos, value: b_v, ..} => a_p == b_pos && a_v != b_v,
-                    _ => true
-                }
-        }
-
+        !matches!((self, other), (DiffOp::Update{value: a_v, ..}, DiffOp::Update{value: b_v, ..}) if a_v == b_v)
     }
 
 }
@@ -352,7 +331,7 @@ fn _compute_hunks(old: &Vec<&str>, new: &Vec<&str>) -> Vec<Chunk> {
 /// Apply the diff ops to `old`, returning the transformed Vec<String>.
 /// Prints inputs, diff, and output (prints MUST be in apply).
 #[cfg(test)]
-fn apply_diff2<'a>(old: &Vec<&'a str>, target: &Vec<&str>, ops: &'a Vec<DiffOp>) -> Result<Vec<String>, String> {
+fn apply_diff2<'a>(old: &Vec<&'a str>, target: &Vec<&str>, ops: &'a Vec<DiffOp>) -> Result<Vec<String>, DocError> {
     fn print_vecs<'a>(label: &str, v: &[&'a str]) {
         println!("{} (len={}):", label, v.len());
         for (i, s) in v.iter().enumerate() {
@@ -385,44 +364,39 @@ fn apply_diff2<'a>(old: &Vec<&'a str>, target: &Vec<&str>, ops: &'a Vec<DiffOp>)
 
 /// Apply the diff ops to `old`, returning the transformed Vec<String>.
 /// Prints inputs, diff, and output (prints MUST be in apply).
-pub (crate) fn apply_diff(old: &Vec<&str>, ops: &Vec<DiffOp>) -> Result<Vec<String>, String> {
+pub (crate) fn apply_diff(old: &Vec<&str>, ops: &Vec<DiffOp>) -> Result<Vec<String>, DocError> {
     // convert old to Vec<String> for mutability
     let mut out = old.iter().map(|s| s.to_string()).collect::<Vec<String>>();
     for op in ops {
         match op {
             DiffOp::Remove { index } => {
                 if *index >= out.len() {
-                    return Err(format!("Remove index {} out of bounds {}", index, out.len()));
+                    return Err(DocError::LineOutOfBounds { op: LineOp::Remove, index: *index, len: out.len() });
                 }
                 out.remove(*index);
             }
             DiffOp::Insert { index, value } => {
                 if *index > out.len() {
-                    return Err(format!("Insert index {} out of bounds {}", index, out.len()));
+                    return Err(DocError::LineOutOfBounds { op: LineOp::Insert, index: *index, len: out.len() });
                 }
                 out.insert(*index, value.clone());
             }
             DiffOp::Update { index, value } => {
                 if *index >= out.len() {
-                    return Err(format!("Update index {} out of bounds {}", index, out.len()));
+                    return Err(DocError::LineOutOfBounds { op: LineOp::Update, index: *index, len: out.len() });
                 }
                 out[*index] = value.clone();
             }
             DiffOp::Append { index, pos, value: suffix } => {
                 if *index >= out.len() {
-                    return Err(format!("Append index {} out of bounds {}", index, out.len()));
+                    return Err(DocError::LineOutOfBounds { op: LineOp::Append, index: *index, len: out.len() });
                 }
                 // pos is a byte index into the current line; we assume prior appends have been applied in-order.
                 if *pos > out[*index].len() {
-                    return Err(format!(
-                        "Append pos {} out of bounds in line {} (len {})",
-                        pos,
-                        index,
-                        out[*index].len()
-                    ));
+                    return Err(DocError::AppendPosOutOfBounds { pos: *pos, line: *index, len: out[*index].len() });
                 }
                 if suffix.contains('\n') || suffix.contains('\r') {
-                    return Err("Append suffix contains end-of-line".to_string());
+                    return Err(DocError::AppendEol { line: *index });
                 }
                 out[*index].insert_str(*pos, suffix);
             }
@@ -436,64 +410,8 @@ impl MismatchDocCow<String> for Mismatch {
     fn apply(&self, input: &String) -> Result<String, DocError> {
         let a: Vec<&str> = input.split("\n").collect();
         apply_diff(&a, &self.0)
-            .map_err(|e| DocError::new(e))
             .map(|v| v.join("\n"))
     }
-
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
-struct Range {
-    start: usize,
-    /// will set to Some when next different op type found
-    end: Option<usize>,
-    /// the range starts on insert (true) or delete (false)
-    add: bool,
-}
-
-impl Range {
-
-    fn overlap(&self, other: &Self) -> bool {
-        let s1 = self.start;
-        let e1 = self.end.unwrap_or(usize::MAX);
-        let s2 = other.start;
-        let e2 = other.end.unwrap_or(usize::MAX);
-        !(e1 < s2 || e2 < s1)
-    }
-
-    fn new(input: &Vec<DiffOp>) -> Vec<Self> {
-        let mut ranges: Vec<Range> = Vec::new();
-        for op in input {
-            let add = match op {
-                DiffOp::Remove { .. } => {
-                    false
-                },
-                DiffOp::Insert { .. } => {
-                    true
-                }
-                _ => {
-                    continue;
-                }
-            };
-            if ranges.len() == 0 || ranges[ranges.len()-1].add != add {
-                ranges.push(Range{ start: op.index(), end: None, add });
-            } else {
-                let mut found = false;
-                for r in ranges.iter_mut().rev() {
-                    if r.add == add && r.end.is_none() {
-                        r.end = Some(op.index());
-                        found = true;
-                        break;
-                    }
-                }
-                if !found {
-                    ranges.push(Range{ start: op.index(), end: None, add });
-                }
-            }
-        }
-        ranges
-    }
-
 
 }
 
@@ -511,23 +429,34 @@ impl MismatchDoc<String> for Mismatch {
         Ok(Mismatch(diff(base, input)))
     }
 
-    fn is_intersect(&self, other: &Self) -> Result<bool, DocError> {
-        let ranges = Range::new(&other.0);
-        for r1 in &Range::new(&self.0) {
-            for r2 in &ranges {
-                if r1.overlap(r2) {
-                    return Ok(true);
+    /// The ops name lines by number, and apply without renumbering: a remove or insert
+    /// moves every line from its own on, and the other patch's numbers from there no
+    /// longer name the lines they did. So patches intersect when both remove or insert;
+    /// when one does and the other has an op from its first moved line on; and when
+    /// both change one line, other than alike
+    fn intersections(&self, other: &Self) -> Result<Vec<Intersection>, DocError> {
+        let mut found = Vec::new();
+        let mut add = |a: usize, b: usize, reason: Reason, line: usize| {
+            if !found.iter().any(|x: &Intersection| x.a == a && x.b == b) {
+                found.push(Intersection { a, b, reason, at: (line + 1).to_string() });
+            }
+        };
+        match (self.moves_from(), other.moves_from()) {
+            (Some((a, from_a)), Some((b, from_b))) => add(a, b, Reason::BothMoveLines, from_a.min(from_b)),
+            (Some((a, from)), None) => other.0.iter().enumerate().filter(|(_, o)| o.index() >= from)
+                .for_each(|(b, _)| add(a, b, Reason::LineMoved, from)),
+            (None, Some((b, from))) => self.0.iter().enumerate().filter(|(_, o)| o.index() >= from)
+                .for_each(|(a, _)| add(a, b, Reason::LineMoved, from)),
+            (None, None) => {}
+        }
+        for (a, x) in self.0.iter().enumerate() {
+            for (b, y) in other.0.iter().enumerate() {
+                if x.unmatch(y) {
+                    add(a, b, Reason::SameLine, x.index());
                 }
             }
         }
-
-        // there is no lines to delete (None value) and update after
-        for k in &self.0 {
-            if other.0.iter().find_map(|v| Some(v.unmatch(k))).unwrap_or(false) {
-                return Ok(true);
-            }
-        }
-        Ok(false)
+        Ok(found)
     }
 
     fn len(&self) -> usize {
@@ -536,23 +465,10 @@ impl MismatchDoc<String> for Mismatch {
 }
 
 impl Mismatch {
-    fn _min2delete(&self) -> Option<usize> {
-        self.0.iter()
-            .filter(| v| v._is_delete_insert())
-            .map(|k| k.index()).min()
-    }
-
-    fn _max2update(&self) -> Option<usize> {
-        self.0.iter()
-            .filter(| v| !v._is_delete_insert())
-            .map(|k| k.index()).max()
-    }
-
-    /// the minimum remove index (None in value) must be greater than update
-    fn _valid(&self) -> bool {
-        self._min2delete()
-            .map(|m| m >= self._max2update().unwrap_or(0))
-            .unwrap_or(true)
+    /// the first line a remove or insert moves, and that op's position: the lines before
+    /// it keep their numbers whatever the ops, the ones after the ops' first move may not
+    fn moves_from(&self) -> Option<(usize, usize)> {
+        self.0.iter().enumerate().filter(|(_, o)| o.shifts()).map(|(i, o)| (i, o.index())).min_by_key(|(_, l)| *l)
     }
 }
 
@@ -679,7 +595,7 @@ mod tests {
             value: "x".into(),
         }];
         let err = apply_diff2(&old, &old, &bad_ops).unwrap_err();
-        assert!(err.contains("out of bounds"));
+        assert!(matches!(err, DocError::AppendPosOutOfBounds { pos: 10, line: 0, .. }), "{:?}", err);
 
         let bad_ops2 = vec![DiffOp::Append {
             index: 0,
@@ -687,7 +603,7 @@ mod tests {
             value: "x\ny".into(),
         }];
         let err2 = apply_diff2(&old, &old, &bad_ops2).unwrap_err();
-        assert!(err2.contains("end-of-line"));
+        assert!(matches!(err2, DocError::AppendEol { line: 0 }), "{:?}", err2);
     }
 
     #[test]
@@ -719,17 +635,32 @@ mod tests {
 
     }
 
+    /// the line numbers of one patch after the other's first remove or insert are not
+    /// the lines they were; one line changed by both, other than alike, is a conflict
     #[test]
-    fn test_ranges() {
-        // test range overlap
-        let r1 = Range{ start: 2, end: Some(5), add: true };
-        let r2 = Range{ start: 4, end: Some(6), add: true };
-        let r3 = Range{ start: 6, end: Some(8), add: true };
-        let r4 = Range{ start: 5, end: None, add: false };
-        assert!(r1.overlap(&r2));
-        assert!(!r1.overlap(&r3));
-        assert!(r2.overlap(&r3));
-        assert!(r3.overlap(&r4));
+    fn test_intersect_rules() {
+        let up = |index: usize, v: &str| DiffOp::Update { index, value: v.into() };
+        let ins = |index: usize| DiffOp::Insert { index, value: "x".into() };
+        let rm = |index: usize| DiffOp::Remove { index };
+        let app = |index: usize, pos: usize| DiffOp::Append { index, pos, value: "x".into() };
+        let x = |a: Vec<DiffOp>, b: Vec<DiffOp>| {
+            let (a, b) = (Mismatch(a), Mismatch(b));
+            let r = a.is_intersect(&b).unwrap();
+            assert_eq!(r, b.is_intersect(&a).unwrap(), "symmetric");
+            r
+        };
+        assert!(!x(vec![up(1, "a")], vec![up(2, "b")]));
+        assert!(!x(vec![up(1, "a")], vec![up(1, "a")]), "the same update");
+        assert!(x(vec![up(1, "a")], vec![up(5, "c"), up(1, "b")]), "every op compared");
+        assert!(x(vec![app(1, 0)], vec![app(1, 3)]), "appends move each other");
+        assert!(x(vec![up(1, "a")], vec![app(1, 3)]));
+        // a move from line 5 on: the other's ops before it only
+        assert!(!x(vec![rm(5)], vec![up(4, "b"), app(2, 0)]));
+        assert!(x(vec![rm(5)], vec![up(5, "b")]));
+        assert!(x(vec![ins(5)], vec![up(9, "b")]));
+        assert!(x(vec![up(2, "a"), ins(5)], vec![up(2, "b")]), "and the same line before it");
+        assert!(x(vec![rm(9)], vec![ins(2)]), "both move lines");
+        assert!(x(vec![rm(3)], vec![rm(3)]), "a line removed twice is two");
     }
 
 }

@@ -1,0 +1,51 @@
+name: ci
+
+# The tests with each feature set, and the line coverage of them all: under 90% fails
+# the run. The coverage goes to Codecov (the README badge) through GitHub's OIDC token -
+# no secret; the repository is enabled once at codecov.io.
+on:
+  push:
+    branches-ignore: ["dependabot/**"]   # their pull request runs it
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # default: i18n; English only, no rust-i18n; with the GNU patch
+        features: ["", "--no-default-features", "--features patch"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test ${{ matrix.features }}
+
+  coverage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write   # Codecov's OIDC upload
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - run: cargo llvm-cov --features patch --lcov --output-path lcov.info --fail-under-lines 90
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lcov.info
+          use_oidc: true
+          # a fork's pull request has no token: the gate above holds without the upload
+          fail_ci_if_error: false

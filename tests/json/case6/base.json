@@ -1,0 +1,11 @@
+{
+  "order": [
+    "first",
+    "second",
+    "third",
+    "fourth"
+  ],
+  "meta": {
+    "rev": 1
+  }
+}

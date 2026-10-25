@@ -1,21 +1,40 @@
 #![forbid(unsafe_code)]
+// [i18n] locales/*.yml, compiled in; a language without a message is English
+#[cfg(feature = "i18n")]
+rust_i18n::i18n!("locales", fallback = "en");
+
+#[macro_use]
+mod i18n;
+mod error;
+mod intersection;
 #[cfg(feature="patch")] pub mod patch;
 pub mod txt;
 pub mod diff;
 pub mod generic;
 mod vec_processor;
 mod map_processor;
+mod xml;
 
-use std::borrow::Cow;
 use std::fmt;
 use std::fmt::Display;
+
+pub use error::{DocError, Format, LineOp};
+pub use intersection::{Intersection, Reason};
+pub use i18n::set_lang;
 
 /// document were implements contract to deal with differences
 pub trait MismatchDoc<T> {
     fn new(base: &T, input: &T) -> Result<Self, DocError> where Self: Sized;
 
+    /// where the two patches intersect: each pair of a change of self (A) and one of
+    /// other (B) that do not commute, and why; empty when they are disjoint, and apply
+    /// in any order to the same result
+    fn intersections(&self, other: &Self) -> Result<Vec<Intersection>, DocError>;
+
     /// return false if no intersection between two patches and they can apply in any order
-    fn is_intersect(&self, other: &Self) -> Result<bool, DocError>;
+    fn is_intersect(&self, other: &Self) -> Result<bool, DocError> {
+        Ok(!self.intersections(other)?.is_empty())
+    }
 
     fn len(&self) -> usize;
 }
@@ -44,23 +63,6 @@ pub enum Mismatches {
     Doc(diff::Mismatch),
     /// line number strings update and trim only
     Text(txt::Mismatch),
-}
-
-
-#[derive(Debug)]
-pub struct DocError(Cow<'static, str>);
-
-impl DocError {
-    fn new<E: Into<Cow<'static, str>>>(e: E) -> Self {
-        Self(e.into())
-    }
-}
-impl std::error::Error for DocError {}
-
-impl Display for DocError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
 }
 
 impl Display for Mismatches {

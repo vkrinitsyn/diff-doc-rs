@@ -1,5 +1,12 @@
 ## diff-doc-rs
 
+[![ci](https://github.com/vkrinitsyn/diff-doc-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/vkrinitsyn/diff-doc-rs/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/vkrinitsyn/diff-doc-rs/graph/badge.svg)](https://codecov.io/gh/vkrinitsyn/diff-doc-rs)
+[![audit](https://github.com/vkrinitsyn/diff-doc-rs/actions/workflows/audit.yml/badge.svg)](https://github.com/vkrinitsyn/diff-doc-rs/actions/workflows/audit.yml)
+[![crates.io](https://img.shields.io/crates/v/diff_doc.svg)](https://crates.io/crates/diff_doc)
+[![docs.rs](https://docs.rs/diff_doc/badge.svg)](https://docs.rs/diff_doc)
+[![license](https://img.shields.io/crates/l/diff_doc.svg)](LICENSE)
+
 ### Calculate diff on structured documents with commutative patch apply.
 
 Provided by [DBinvent](https://www.dbinvent.com), and an essential part of
@@ -34,14 +41,59 @@ Notice:
 Array deletion must not have at index less than other patch array update, neither two different index's delete.
 Same apply for simplified plain text patch where line nimber use as index.
 
+### Where patches intersect
+
+`is_intersect` says whether two patches commute; `intersections` says where they do not:
+each pair of a change of A and one of B that would apply differently in the other
+order, why, and where - a document's path as a JSON pointer, a text's line, a GNU
+patch's lines of the base. Empty when the patches are disjoint.
+
+```rust
+use diff_doc::{MismatchDoc, diff::Mismatch, generic::from_json};
+
+let base = from_json(r#"{"map": {"x": 1, "n": null}, "list": [1, 2, 3]}"#)?;
+let a = Mismatch::new(&base, &from_json(r#"{"list": [1, 2, 3]}"#)?)?;
+let b = Mismatch::new(&base, &from_json(r#"{"map": {"x": 1}, "list": [1, 2, 3]}"#)?)?;
+for i in a.intersections(&b)? {
+    println!("{i}");
+    // DD-I001 change 1 of A and change 1 of B: one changes the node /map, the other inside it
+}
+```
+
+The reasons: a node changed and inside it (`Inside`), a swap or clone reading the
+other's element (`OtherElement`), one node changed differently (`SameNode`), an array
+element moved by the other's remove or insert (`ArrayShift`), a node taken as a map and
+as an array (`NodeKind`); in a text, both moving lines (`BothMoveLines`), a line moved
+by the other (`LineMoved`), one line changed differently (`SameLine`); in GNU patches,
+hunks reading the same lines (`HunksOverlap`).
+
 ### Support documents type:
 
 - [x] Json - default format for Postgres document storage
 - [x] Text - plain text simplified diff as arrays of strings
-- [x] XML - serde-xml-rs
+- [x] XML - roxmltree, mapped to the generic document by this crate: attributes as `@name`,
+  a repeated element as an array, text beside elements as `$text` (see `src/xml.rs`)
 - [x] Yaml - serde-saphyr
 - [x] Toml - toml-rs
 - [x] Diff - plain text document with default diff file format, wrapper to diffy (optional feature)
 
-### TODO
-- Add more examples to integration tests
+### Features
+
+- `i18n` (default) - the error messages in en, ru, fr, de, zh and ja, chosen by
+  `diff_doc::set_lang` or `LANG`; without it English only, and no rust-i18n. Each of
+  diff_doc's own errors starts with its code, `DD-Ennn`, the same in every language; a
+  document's parse error is its parser's message, after the format: `JSON: ...`.
+- `patch` - the GNU diff format, through diffy.
+
+### Tests
+
+Each case in `tests/json`, `tests/txt` and `tests/patch_diff` is a base and two changes
+of it, `a` and `b`: with a `result`, the patches of `a` and `b` must not intersect, and
+Base + A + B = Base + B + A = result; without one, they must intersect.
+`tests/commute` checks the same on random changes, seeded:
+
+```
+cargo test --features patch
+COMMUTE_SEED=5 COMMUTE_ROUNDS=100000 cargo test --features patch commute
+cargo llvm-cov --features patch --summary-only    # coverage is about 95% at least in CI
+```
