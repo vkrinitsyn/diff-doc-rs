@@ -243,6 +243,19 @@ pub fn from_xml(s: &str) -> Result<GenericValue, roxmltree::Error> {
     crate::xml::from_xml(s)
 }
 
+/// a BSON document, as DocumentDB and MongoDB store it - see bson_doc.rs: its types
+/// beyond JSON's as extended JSON, `{"$oid": ...}`, `{"$date": ...}`
+#[cfg(feature = "bson")]
+pub fn from_bson(bytes: &[u8]) -> Result<GenericValue, bson::error::Error> {
+    crate::bson_doc::from_bson(bytes)
+}
+
+/// from_bson of a document the driver has read already
+#[cfg(feature = "bson")]
+pub fn from_bson_document(doc: bson::Document) -> Result<GenericValue, bson::error::Error> {
+    crate::bson_doc::from_bson_document(doc)
+}
+
 // --- Serialization Functions ---
 pub fn to_json(value: &GenericValue) -> Result<String, serde_json::Error> {
     serde_json::to_string_pretty(value)
@@ -261,9 +274,22 @@ pub fn to_xml(value: &GenericValue) -> Result<String, crate::DocError> {
     crate::xml::to_xml(value)
 }
 
-/// a string a number is read from: an integer or a float
+/// the bytes of a BSON document: a map, its keys sorted - see bson_doc.rs
+#[cfg(feature = "bson")]
+pub fn to_bson(value: &GenericValue) -> Result<Vec<u8>, crate::DocError> {
+    crate::bson_doc::to_bson(value)
+}
+
+/// to_bson, as a document for the driver to write
+#[cfg(feature = "bson")]
+pub fn to_bson_document(value: &GenericValue) -> Result<bson::Document, crate::DocError> {
+    crate::bson_doc::to_bson_document(value)
+}
+
+/// a string a number is read from: an integer or a float - a finite one: "NaN" and
+/// "inf" are no JSON number, as a Numeric they would write as null
 pub(crate) fn is_numeric(s: &str) -> bool {
-    s.parse::<u128>().is_ok() || s.parse::<i128>().is_ok() || s.parse::<f64>().is_ok()
+    s.parse::<u128>().is_ok() || s.parse::<i128>().is_ok() || s.parse::<f64>().is_ok_and(f64::is_finite)
 }
 
 

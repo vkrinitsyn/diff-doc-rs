@@ -22,12 +22,20 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # default: i18n; English only, no rust-i18n; with the GNU patch
-        features: ["", "--no-default-features", "--features patch"]
+        # default: i18n; English only, no rust-i18n; with the GNU patch; with BSON
+        features: ["", "--no-default-features", "--features patch", "--features bson"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test ${{ matrix.features }}
+
+  # the C library, BSON with it: c/testdata is the Rust side's BSON of every type
+  c:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y protobuf-c-compiler libprotobuf-c-dev
+      - run: make -C c test BSON=1
 
   coverage:
     runs-on: ubuntu-latest
@@ -42,7 +50,7 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
-      - run: cargo llvm-cov --features patch --lcov --output-path lcov.info --fail-under-lines 90
+      - run: cargo llvm-cov --features patch,bson --lcov --output-path lcov.info --fail-under-lines 90
       - uses: codecov/codecov-action@v5
         with:
           files: lcov.info

@@ -1,0 +1,7 @@
+diff-doc-rs (diff_doc) - diff and commutative 3-way patch of structured documents:
+JSON, YAML, TOML, XML, BSON and text.
+
+Copyright (c) 2025-2026 Vladimir Krinitsyn, DBinvent
+
+Licensed under the MIT license: see LICENSE. The crates it is built with keep their
+own licenses, as Cargo.lock lists them.

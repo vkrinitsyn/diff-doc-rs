@@ -1,12 +1,12 @@
 
 [package]
 name = "diff_doc"
-version = "0.8.1"
+version = "1.0.1"
 edition = "2024"
-description = "A document diffing library supporting multiple formats (JSON, YAML, XML, TOML)."
+description = "A document diffing library supporting multiple formats (JSON, YAML, XML, TOML, BSON)."
 license = "MIT"
 repository = "https://github.com/vkrinitsyn/diff-doc-rs"
-authors = ["Vladimir Krinitsyn"]
+authors = ["Vladimir Krinitsyn <v.krinitsyn@gmail.com>", "DBinvent <support@dbinvent.com>"]
 
 
 [dependencies]
@@ -30,6 +30,10 @@ toml = "^1"
 # its configuration)
 rust-i18n = { version = "^4.2.4", optional = true }
 
+# BSON (bson.rs), as DocumentDB and MongoDB store it: its types beyond JSON's as
+# extended JSON, which the bson crate reads back (serde, serde_json-1)
+bson = { version = "^3.1", optional = true, features = ["serde", "serde_json-1"] }
+
 
 [features]
 default = ["i18n"]
@@ -37,3 +41,5 @@ default = ["i18n"]
 i18n = ["dep:rust-i18n"]
 patch = ["dep:diffy"]
 verbose = [] # exta debug messages
+# BSON documents of DocumentDB / MongoDB: from_bson and to_bson
+bson = ["dep:bson"]

@@ -75,6 +75,10 @@ hunks reading the same lines (`HunksOverlap`).
   a repeated element as an array, text beside elements as `$text` (see `src/xml.rs`)
 - [x] Yaml - serde-saphyr
 - [x] Toml - toml-rs
+- [x] BSON - DocumentDB / MongoDB documents, through the bson crate (optional feature): JSON's
+  types as they are, the rest as relaxed extended JSON - `{"$oid": ...}`, `{"$date": ...}`,
+  `{"$numberDecimal": ...}`, an int64 of int32's range `{"$numberLong": ...}` - so each writes
+  back as the BSON type it was (see `src/bson_doc.rs`)
 - [x] Diff - plain text document with default diff file format, wrapper to diffy (optional feature)
 
 ### Features
@@ -84,6 +88,25 @@ hunks reading the same lines (`HunksOverlap`).
   diff_doc's own errors starts with its code, `DD-Ennn`, the same in every language; a
   document's parse error is its parser's message, after the format: `JSON: ...`.
 - `patch` - the GNU diff format, through diffy.
+- `bson` - `from_bson`/`to_bson` on a document's bytes, `from_bson_document`/`to_bson_document`
+  on the driver's `bson::Document` (bson 3, re-exported as `diff_doc::bson`):
+
+```rust
+use diff_doc::{MismatchDoc, MismatchDocMut, diff::Mismatch, generic::*};
+
+let base = from_bson_document(stored)?;     // as read from DocumentDB
+let patch = Mismatch::new(&base, &from_bson_document(edited)?)?;
+let mut doc = base.clone();
+patch.apply_mut(&mut doc, true)?;
+let back: diff_doc::bson::Document = to_bson_document(&doc)?;
+```
+
+  The C library in `c/` (the patch applied in C, from the protobuf of `proto/`) reads and
+  writes the same BSON, optionally: `make BSON=1` adds `bson_doc.c` - `gv_from_bson` and
+  `gv_to_bson` of `c/bson_doc.h`, self-contained, no libbson - so a node applies a patch
+  the Rust side made to the BSON it stores. Both write a document's keys sorted, the
+  `_id` first, so nodes that apply the same patches write the same bytes;
+  `c/testdata/types.bson` holds both to it (`make -C c test BSON=1`).
 
 ### Tests
 
@@ -93,7 +116,7 @@ Base + A + B = Base + B + A = result; without one, they must intersect.
 `tests/commute` checks the same on random changes, seeded:
 
 ```
-cargo test --features patch
+cargo test --features patch,bson
 COMMUTE_SEED=5 COMMUTE_ROUNDS=100000 cargo test --features patch commute
-cargo llvm-cov --features patch --summary-only    # coverage is about 95% at least in CI
+cargo llvm-cov --features patch,bson --summary-only    # coverage is about 95% at least in CI
 ```

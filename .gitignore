@@ -15,3 +15,4 @@ c/*.obj
 c/*.exe
 c/*.a
 c/*.o
+c/test_bson

@@ -47,15 +47,44 @@ fn xml() {
 /// message as it is
 #[test]
 fn a_parse_error_is_a_doc_error() {
-    let errors: Vec<(DocError, Format, &str)> = vec![
+    #[allow(unused_mut)]
+    let mut errors: Vec<(DocError, Format, &str)> = vec![
         (from_json("{").unwrap_err().into(), Format::Json, "JSON: "),
         (from_yaml("a: [").unwrap_err().into(), Format::Yaml, "YAML: "),
         (from_toml("a = ").unwrap_err().into(), Format::Toml, "TOML: "),
         (from_xml("<a>").unwrap_err().into(), Format::Xml, "XML: "),
     ];
+    #[cfg(feature = "bson")]
+    errors.push((from_bson(&[5, 0, 0, 0]).unwrap_err().into(), Format::Bson, "BSON: "));
     for (e, format, code) in errors {
         assert!(matches!(&e, DocError::Format { format: f, .. } if *f == format), "{:?}", e);
         assert!(e.to_string().starts_with(code), "{}", e);
         assert!(std::error::Error::source(&e).is_some());
+    }
+}
+
+/// DocumentDB's documents: A changes a date and an int64, B adds a tag and removes a
+/// field; the ObjectId, the decimal and the int64 stay the types they were
+#[cfg(feature = "bson")]
+#[test]
+fn bson() {
+    use diff_doc::bson::{doc, oid::ObjectId, DateTime, Decimal128};
+    let id = ObjectId::parse_str("65f1a2b3c4d5e6f708192a3b").unwrap();
+    let price: Decimal128 = "9.90".parse().unwrap();
+    let at = |ms| DateTime::from_millis(ms);
+    let read = |d: diff_doc::bson::Document| from_bson(&d.to_vec().unwrap()).unwrap();
+    let base = read(doc! {"_id": id, "price": price, "seen": 1_i64, "at": at(1_000), "tags": ["a"], "old": true});
+    let a = read(doc! {"_id": id, "price": price, "seen": 2_i64, "at": at(2_000), "tags": ["a"], "old": true});
+    let b = read(doc! {"_id": id, "price": price, "seen": 1_i64, "at": at(1_000), "tags": ["a", "b"]});
+    let pa = Mismatch::new(&base, &a).unwrap();
+    let pb = Mismatch::new(&base, &b).unwrap();
+    assert!(!pa.is_intersect(&pb).unwrap());
+    let result = doc! {"_id": id, "at": at(2_000), "price": price, "seen": 2_i64, "tags": ["a", "b"]};
+    for (first, second) in [(&pa, &pb), (&pb, &pa)] {
+        let mut doc = base.clone();
+        assert!(first.apply_mut(&mut doc, true).unwrap().is_empty());
+        assert!(second.apply_mut(&mut doc, true).unwrap().is_empty());
+        assert_eq!(to_bson_document(&doc).unwrap(), result);
+        assert_eq!(to_bson(&doc).unwrap(), result.to_vec().unwrap());
     }
 }

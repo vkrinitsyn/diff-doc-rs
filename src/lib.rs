@@ -14,6 +14,7 @@ pub mod generic;
 mod vec_processor;
 mod map_processor;
 mod xml;
+#[cfg(feature="bson")] mod bson_doc;
 
 use std::fmt;
 use std::fmt::Display;
@@ -21,6 +22,8 @@ use std::fmt::Display;
 pub use error::{DocError, Format, LineOp};
 pub use intersection::{Intersection, Reason};
 pub use i18n::set_lang;
+/// the bson crate of from_bson_document and to_bson_document: its Document, `doc!`
+#[cfg(feature="bson")] pub use bson;
 
 /// document were implements contract to deal with differences
 pub trait MismatchDoc<T> {

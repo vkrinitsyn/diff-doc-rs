@@ -146,6 +146,22 @@ xml.attribute:
   zh: "DD-E404 位于 %{at} 的属性 %{name} 有多个值"
   ja: "DD-E404 %{at} の属性 %{name} に複数の値があります"
 
+# a BSON document of DocumentDB / MongoDB - bson_doc.rs
+bson.root:
+  en: "DD-E501 a BSON document is a map, not a value of extended JSON nor of another type"
+  ru: "DD-E501 документ BSON - это словарь, а не значение расширенного JSON или другого типа"
+  fr: "DD-E501 un document BSON est une table, pas une valeur de JSON étendu ni d'un autre type"
+  de: "DD-E501 ein BSON-Dokument ist eine Map, kein Wert von Extended JSON oder eines anderen Typs"
+  zh: "DD-E501 BSON 文档是映射，而不是扩展 JSON 的值或其他类型的值"
+  ja: "DD-E501 BSON ドキュメントはマップであり、拡張 JSON の値や他の型の値ではありません"
+bson.number:
+  en: "DD-E502 the number %{value} at %{at} has no BSON type: it is past int64"
+  ru: "DD-E502 для числа %{value} в %{at} нет типа BSON: оно вне диапазона int64"
+  fr: "DD-E502 le nombre %{value} à %{at} n'a pas de type BSON : il dépasse int64"
+  de: "DD-E502 die Zahl %{value} bei %{at} hat keinen BSON-Typ: sie liegt außerhalb von int64"
+  zh: "DD-E502 位于 %{at} 的数字 %{value} 没有对应的 BSON 类型：超出 int64 范围"
+  ja: "DD-E502 %{at} の数値 %{value} に対応する BSON 型がありません：int64 の範囲外です"
+
 # where two patches intersect, not an error: Intersection's - intersection.rs
 intersect.inside:
   en: "DD-I001 change %{a} of A and change %{b} of B: one changes the node %{at}, the other inside it"

@@ -43,6 +43,12 @@ pub enum DocError {
     XmlArrayInArray { at: String },
     /// an attribute, `@name`, of a map or an array: an attribute has one value
     XmlAttribute { name: String, at: String },
+    /// BSON's document is a map, and not one of extended JSON's types: `{"$oid": ...}`
+    #[cfg(feature = "bson")]
+    BsonRoot,
+    /// a number BSON has no type for: an integer past int64, at its path
+    #[cfg(feature = "bson")]
+    BsonNumber { value: String, at: String },
     /// a document that does not parse or serialize, with its format's native error
     Format { format: Format, err: Box<dyn std::error::Error + Send + Sync> },
 }
@@ -63,6 +69,8 @@ pub enum Format {
     Yaml,
     Toml,
     Xml,
+    #[cfg(feature = "bson")]
+    Bson,
 }
 
 impl fmt::Display for Format {
@@ -72,6 +80,8 @@ impl fmt::Display for Format {
             Format::Yaml => "YAML",
             Format::Toml => "TOML",
             Format::Xml => "XML",
+            #[cfg(feature = "bson")]
+            Format::Bson => "BSON",
         })
     }
 }
@@ -100,6 +110,10 @@ impl fmt::Display for DocError {
             DocError::XmlName { name, at } => tr!("xml.name", name = name, at = at),
             DocError::XmlArrayInArray { at } => tr!("xml.array_in_array", at = at),
             DocError::XmlAttribute { name, at } => tr!("xml.attribute", name = name, at = at),
+            #[cfg(feature = "bson")]
+            DocError::BsonRoot => tr!("bson.root"),
+            #[cfg(feature = "bson")]
+            DocError::BsonNumber { value, at } => tr!("bson.number", value = value, at = at),
             // the parser's own message, as it says it: nothing of diff_doc's to translate
             DocError::Format { format, err } => format!("{}: {}", format, err),
         };
@@ -151,6 +165,11 @@ from_format! {
     toml::de::Error => Toml,
     toml::ser::Error => Toml,
     roxmltree::Error => Xml,
+}
+
+#[cfg(feature = "bson")]
+from_format! {
+    bson::error::Error => Bson,
 }
 
 #[cfg(test)]
