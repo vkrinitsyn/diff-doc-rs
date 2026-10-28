@@ -51,7 +51,7 @@ jobs:
         with:
           tool: cargo-llvm-cov
       - run: cargo llvm-cov --features patch,bson --lcov --output-path lcov.info --fail-under-lines 90
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v7
         with:
           files: lcov.info
           use_oidc: true
