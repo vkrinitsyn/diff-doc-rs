@@ -25,7 +25,7 @@ jobs:
         # default: i18n; English only, no rust-i18n; with the GNU patch; with BSON
         features: ["", "--no-default-features", "--features patch", "--features bson"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test ${{ matrix.features }}
 
@@ -33,7 +33,7 @@ jobs:
   c:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y protobuf-c-compiler libprotobuf-c-dev
       - run: make -C c test BSON=1
 
@@ -43,7 +43,7 @@ jobs:
       contents: read
       id-token: write   # Codecov's OIDC upload
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: llvm-tools-preview
