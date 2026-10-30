@@ -7,7 +7,9 @@ description = "A document diffing library supporting multiple formats (JSON, YAM
 license = "MIT"
 repository = "https://github.com/vkrinitsyn/diff-doc-rs"
 authors = ["Vladimir Krinitsyn <v.krinitsyn@gmail.com>", "DBinvent <support@dbinvent.com>"]
-
+homepage = "https://vkrinitsyn.github.io/"
+keywords = ["diff", "json", "bson", "yaml", "patch"]
+documentation = "https://github.com/vkrinitsyn/diff-doc-rs"
 
 [dependencies]
 

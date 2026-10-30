@@ -9,11 +9,12 @@
 
 ### Calculate diff on structured documents with commutative patch apply.
 
-Provided by [DBinvent](https://www.dbinvent.com), and an essential part of
-[YT Cluster](https://www.dbinvent.com/cluster/): each node's schema gate compares
-its live schema with the leader's through these diffs before any data is compared,
-and when two writers change the same list in a replicated jsonb document, both
-changes apply if they are disjoint.
+> [!NOTE]
+> Provided by [DBinvent](https://www.dbinvent.com), and an essential part of
+> [YT Cluster](https://www.dbinvent.com/cluster/): each node's schema gate compares
+> its live schema with the leader's through these diffs before any data is compared,
+> and when two writers change the same list in a replicated jsonb document, both
+> changes apply if they are disjoint.
 
 Create and restore diff mismatch from text or json file.
 
