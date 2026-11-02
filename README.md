@@ -1,7 +1,7 @@
 ## diff-doc-rs
 
 [![ci](https://github.com/vkrinitsyn/diff-doc-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/vkrinitsyn/diff-doc-rs/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/vkrinitsyn/diff-doc-rs/graph/badge.svg)](https://codecov.io/gh/vkrinitsyn/diff-doc-rs)
+[![coverage](https://raw.githubusercontent.com/vkrinitsyn/diff-doc-rs/badges/coverage.svg?sanitize=true)](https://github.com/vkrinitsyn/diff-doc-rs/actions/workflows/ci.yml)
 [![audit](https://github.com/vkrinitsyn/diff-doc-rs/actions/workflows/audit.yml/badge.svg)](https://github.com/vkrinitsyn/diff-doc-rs/actions/workflows/audit.yml)
 [![crates.io](https://img.shields.io/crates/v/diff_doc.svg)](https://crates.io/crates/diff_doc)
 [![docs.rs](https://docs.rs/diff_doc/badge.svg)](https://docs.rs/diff_doc)
