@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use crate::generic::*;
 
 /// identify min_map_changes
-pub(crate) fn min_map_changes(base_map: &HashMap<String, GenericValue>, input_map: &HashMap<String, GenericValue>, path: &Vec<DocIndex>) -> Vec<Hunk> {
+pub(crate) fn min_map_changes(base_map: &HashMap<String, GenericValue>, input_map: &HashMap<String, GenericValue>, path: &[DocIndex]) -> Vec<Hunk> {
         let mut diff = Vec::new();
         let mut input: HashSet<&String>  = input_map.keys().collect();
 
@@ -13,7 +13,7 @@ pub(crate) fn min_map_changes(base_map: &HashMap<String, GenericValue>, input_ma
                     Hunk::append(&mut diff, path, DocIndex::Name(base_key.clone()), HunkAction::Remove);
                 }
                 Some(b) => {
-                    let mut p = path.clone();
+                    let mut p = path.to_vec();
                     p.push(DocIndex::Name(base_key.clone()));
                     let mut v = GenericValue::diff(base_value, b, &p);
                     diff.append(&mut v);

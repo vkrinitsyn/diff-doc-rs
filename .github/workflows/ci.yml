@@ -24,8 +24,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # default: i18n; English only, no rust-i18n; with the GNU patch; with BSON
-        features: ["", "--no-default-features", "--features patch", "--features bson"]
+        # default: i18n; English only, no rust-i18n; with the GNU patch; with BSON; with the proto types
+        features: ["", "--no-default-features", "--features patch", "--features bson", "--features proto"]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable

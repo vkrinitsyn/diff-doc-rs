@@ -61,8 +61,8 @@ impl Hash for GenericValue {
 pub(crate) fn hs<T: Hash>(input: &T) -> u64 {
     let mut hasher = DefaultHasher::new();
     input.hash(&mut hasher);
-    let h = hasher.finish();
-    h
+    
+    hasher.finish()
 }
 
 
@@ -120,8 +120,8 @@ pub struct Hunk {
 }
 
 impl Hunk {
-    pub(crate) fn append(diff: &mut Vec<Hunk>, path: &Vec<DocIndex>, current: DocIndex, value: HunkAction) {
-        let mut path = path.clone();
+    pub(crate) fn append(diff: &mut Vec<Hunk>, path: &[DocIndex], current: DocIndex, value: HunkAction) {
+        let mut path = path.to_vec();
         path.push(current);
         diff.push(Self { path, value })
     }
@@ -135,8 +135,8 @@ impl Display for Hunk {
 
 
 impl GenericValue {
-    fn as_update(&self, path: &Vec<DocIndex>) -> Vec<Hunk> {
-        vec![Hunk { path: path.clone(), value: HunkAction::Update(self.clone()) }]
+    fn as_update(&self, path: &[DocIndex]) -> Vec<Hunk> {
+        vec![Hunk { path: path.to_vec(), value: HunkAction::Update(self.clone()) }]
     }
 
     pub(crate) fn _chars(&self) -> Vec<char> {
@@ -147,7 +147,7 @@ impl GenericValue {
     }
 
     /// identify minimum changes
-    pub fn diff(base: &Self, input: &Self, path: &Vec<DocIndex>) -> Vec<Hunk> {
+    pub fn diff(base: &Self, input: &Self, path: &[DocIndex]) -> Vec<Hunk> {
         match base {
             GenericValue::Numeric(a) => {
                 if let GenericValue::Numeric(b) = input {
@@ -191,7 +191,7 @@ impl GenericValue {
                         if a.len() + b.len() > (u16::MAX >> 4) as usize {
                             // use text diff
                             let ops = crate::txt::diff(a, b);
-                            vec![Hunk { path: path.clone(), value: HunkAction::UpdateTxt(ops) }]
+                            vec![Hunk { path: path.to_vec(), value: HunkAction::UpdateTxt(ops) }]
                         } else {
                             input.as_update(path)
                         }

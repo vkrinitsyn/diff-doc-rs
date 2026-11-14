@@ -108,6 +108,11 @@ let back: diff_doc::bson::Document = to_bson_document(&doc)?;
   the Rust side made to the BSON it stores. Both write a document's keys sorted, the
   `_id` first, so nodes that apply the same patches write the same bytes;
   `c/testdata/types.bson` holds both to it (`make -C c test BSON=1`).
+- `proto` - `diff_doc::proto`: the Rust types of `proto/diff_doc.proto` (prost messages with
+  serde), so a protocol whose messages carry a `Mismatches` imports `diff_doc.proto` and
+  takes these types (prost-build `extern_path(".diff_doc", "::diff_doc::proto")`) rather
+  than compiling a copy; a `Mismatches` prints as its text and feeds a hasher. Generated
+  already, in `src/proto_types.rs`: no protoc needed.
 
 ### Tests
 
@@ -117,7 +122,7 @@ Base + A + B = Base + B + A = result; without one, they must intersect.
 `tests/commute` checks the same on random changes, seeded:
 
 ```
-cargo test --features patch,bson
+cargo test --features patch,bson,proto
 COMMUTE_SEED=5 COMMUTE_ROUNDS=100000 cargo test --features patch commute
 cargo llvm-cov --features patch,bson --summary-only    # coverage is about 95% at least in CI
 ```

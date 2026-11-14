@@ -101,7 +101,7 @@ impl Hunk {
                                     }
                                 }
                                 HunkAction::Insert(v) => {
-                                    m.insert(p.clone(), v.clone());
+                                    m.insert(*p, v.clone());
                                 }
                                 HunkAction::Swap(v)=> {
                                     if let DocIndex::Idx(vv) = v {
@@ -144,7 +144,7 @@ fn copy(vec: &mut Vec<GenericValue>, destination_idx: usize, source_idx: usize) 
     vec.insert(destination_idx, vec[source_idx].clone());
 }
 
-fn swap(vec: &mut Vec<GenericValue>, a: &usize, b: &usize) {
+fn swap(vec: &mut [GenericValue], a: &usize, b: &usize) {
     let len = vec.len();
     if *a >= len || *b >= len {
         return;
@@ -161,7 +161,7 @@ impl MismatchDoc<GenericValue> for Mismatch {
     where
         Self: Sized
     {
-        Ok(Mismatch(GenericValue::diff(base, &input, &vec![])))
+        Ok(Mismatch(GenericValue::diff(base, input, &[])))
     }
 
     fn intersections(&self, input: &Self) -> Result<Vec<Intersection>, DocError> {
@@ -202,11 +202,10 @@ impl Hash for PathKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         ".".hash(state);
         for (idx, p) in self.0.iter().enumerate() {
-            if idx+1 == self.0.len() {
-                if let DocIndex::Idx(_) = p {
+            if idx+1 == self.0.len()
+                && let DocIndex::Idx(_) = p {
                     break;
                 }
-            }
             p.hash(state);
         }
     }
@@ -218,7 +217,7 @@ impl PathRange {
     fn new(input: &Vec<Hunk>) -> PathMapType {
         let mut ranges: PathMapType = HashMap::new();
         for op in input {
-            debug_assert!(op.path.len() > 0, "invalid hunk with empty path: {:?}", op);
+            debug_assert!(!op.path.is_empty(), "invalid hunk with empty path: {:?}", op);
             if let DocIndex::Idx(idx) = op.path[op.path.len()-1] {
                 let add = match op.value {
                     HunkAction::Insert(_) |
@@ -229,7 +228,7 @@ impl PathRange {
                 let key = PathKey(op.path.clone());
                 // insert into ranges
                 ranges.get_mut(&key).map(|v| {
-                    if v.len() == 0 || v[v.len() - 1].range.add != add {
+                    if v.is_empty() || v[v.len() - 1].range.add != add {
                         v.push(PathRange { path: op.path.clone(), range: Range { start: idx, end: None, add } });
                     } else {
                         let mut found = false;
@@ -271,7 +270,7 @@ fn pointer(path: &[DocIndex]) -> String {
 /// check for intersection of two patches by path for update or delete of documents including vec/array:
 /// why, and the path where
 fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapType, _msg: &str) -> Option<(Reason, Vec<DocIndex>)> {
-    if a.path.len() == 0 || b.path.len() == 0 {
+    if a.path.is_empty() || b.path.is_empty() {
         return None; // assert no changes
     }
 
@@ -294,12 +293,11 @@ fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapTy
     // the reverse: check b in ranges_a will be in another call
     for i in 0..comp2idx {
         let cmp_val = a.path.len() == i+1 || b.path.len() == i+1;
-        if !cmp_val {
-            if a.path[i] != b.path[i]
+        if !cmp_val
+            && a.path[i] != b.path[i]
             {
                 return None; // diverged paths
             }
-        }
 
         if let Some(cause) = is_intersect2(a, b, i, ranges_b) {
             #[cfg(feature="verbose")] println!("is_intersect {_msg} upto {comp2idx} as step {i} of {comp2idx} by: {cause:?}\nBase action: {a}\nInterfere with: {b}");
@@ -313,7 +311,7 @@ fn is_intersect(a: &Hunk, ranges_a: &PathMapType, b: &Hunk, ranges_b: &PathMapTy
         for r in x {
             for p in v {
                 if p.range.overlap(&r.range) {
-                    #[cfg(feature="verbose")] println!("is_intersect {_msg} as overlap {p:?} with {:?}", &r.range);
+                    #[cfg(feature="verbose")] println!("is_intersect {_msg} as overlap {p:?} with {:?}", r.range);
                     return Some((Reason::ArrayShift, a.path[..a.path.len() - 1].to_vec()));
                 }
             }
@@ -347,23 +345,21 @@ fn is_intersect2(a: &Hunk, b: &Hunk, idx: usize, ranges_b: &PathMapType) -> Opti
     }
 
     // check A in ranges_b
-    if a.path.len() > 2 {
-        if let DocIndex::Idx(idx) = a.path[a.path.len() - 1] {
-            if let Some(ps) = ranges_b.get(&PathKey(a.path[..max(a.path.len() - 2, 0)].to_vec())) {
+    if a.path.len() > 2
+        && let DocIndex::Idx(idx) = a.path[a.path.len() - 1]
+            && let Some(ps) = ranges_b.get(&PathKey(a.path[..max(a.path.len() - 2, 0)].to_vec())) {
                 for p in ps {
                     if p.range.start < idx && p.range.end.unwrap_or(usize::MAX) > idx {
                         return Some((Reason::ArrayShift, a.path[..a.path.len() - 1].to_vec()));
                     }
                 }
             }
-        }
-    }
     if a.path.len() == idx+1 || b.path.len() == idx+1 {
         let reason = match &a.path[idx] {
             DocIndex::Name(a_path) => {
                 match &b.path[idx] {
                     DocIndex::Name(b_path) =>
-                        return_(a_path == b_path && &a.value != &b.value, Reason::SameNode),
+                        return_(a_path == b_path && a.value != b.value, Reason::SameNode),
                     DocIndex::Idx(_) =>
                         return_(a.value != b.value, Reason::NodeKind),
                 }

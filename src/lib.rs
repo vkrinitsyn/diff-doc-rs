@@ -15,6 +15,7 @@ mod vec_processor;
 mod map_processor;
 mod xml;
 #[cfg(feature="bson")] mod bson_doc;
+#[cfg(feature="proto")] pub mod proto;
 
 use std::fmt;
 use std::fmt::Display;
@@ -40,6 +41,11 @@ pub trait MismatchDoc<T> {
     }
 
     fn len(&self) -> usize;
+
+    /// whether there is no difference: `len` is 0
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 /// document update as mutation
@@ -81,6 +87,7 @@ impl Display for Mismatches {
 #[cfg(test)]
 mod tests {
     #[test]
+    #[allow(clippy::assertions_on_constants)] // a build check: it passes when the crate compiles
     fn test_compile() {
         assert!(true);
     }

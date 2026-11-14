@@ -66,7 +66,7 @@ impl fmt::Display for DiffOp {
 }
 
 /// Compute the LCS DP table (line-level).
-fn lcs_table(a: &Vec<&str>, b: &Vec<&str>) -> Vec<Vec<usize>> {
+fn lcs_table(a: &[&str], b: &[&str]) -> Vec<Vec<usize>> {
     let n = a.len();
     let m = b.len();
     let mut dp = vec![vec![0usize; m + 1]; n + 1];
@@ -83,7 +83,7 @@ fn lcs_table(a: &Vec<&str>, b: &Vec<&str>) -> Vec<Vec<usize>> {
 }
 
 /// Backtrack LCS matches into forward-ordered pairs (indices into a and b).
-fn backtrack_matches(a: &Vec<&str>, b: &Vec<&str>, dp: &[Vec<usize>]) -> Vec<(usize, usize)> {
+fn backtrack_matches(a: &[&str], b: &[&str], dp: &[Vec<usize>]) -> Vec<(usize, usize)> {
     let mut i = a.len();
     let mut j = b.len();
     let mut matches = Vec::new();
@@ -194,7 +194,7 @@ fn inline_insert_appends(index: usize, old_line: &str, new_line: &str) -> Option
     }
 
     let total_insert_len: usize = inserts.iter().map(|(_, s)| s.chars().count()).sum();
-    if old_chars.len() > 0 && total_insert_len * 2 >= old_chars.len() {
+    if !old_chars.is_empty() && total_insert_len * 2 >= old_chars.len() {
         return None;
     }
 
@@ -243,7 +243,7 @@ pub fn compute_diff(old: &Vec<&str>, new: &Vec<&str>) -> Vec<DiffOp> {
         let paired = rem_count.min(ins_count);
         for k in 0..paired {
             let idx = cursor + k;
-            let chunk = update_or_append_multi(idx, &old[ai + k], &new[bi + k]);
+            let chunk = update_or_append_multi(idx, old[ai + k], new[bi + k]);
             ops.extend(chunk);
         }
         if rem_count > ins_count {
@@ -273,7 +273,7 @@ pub fn compute_diff(old: &Vec<&str>, new: &Vec<&str>) -> Vec<DiffOp> {
     let paired = rem_count.min(ins_count);
     for k in 0..paired {
         let idx = cursor + k;
-        let chunk = update_or_append_multi(idx, &old[ai + k], &new[bi + k]);
+        let chunk = update_or_append_multi(idx, old[ai + k], new[bi + k]);
         ops.extend(chunk);
     }
     if rem_count > ins_count {
@@ -332,13 +332,13 @@ fn _compute_hunks(old: &Vec<&str>, new: &Vec<&str>) -> Vec<Chunk> {
 /// Prints inputs, diff, and output (prints MUST be in apply).
 #[cfg(test)]
 fn apply_diff2<'a>(old: &Vec<&'a str>, target: &Vec<&str>, ops: &'a Vec<DiffOp>) -> Result<Vec<String>, DocError> {
-    fn print_vecs<'a>(label: &str, v: &[&'a str]) {
+    fn print_vecs(label: &str, v: &[&str]) {
         println!("{} (len={}):", label, v.len());
         for (i, s) in v.iter().enumerate() {
             println!("  {:>3}: {:?}", i, s);
         }
     }
-    fn print_vec<'a>(label: &str, v: &Vec<String>) {
+    fn print_vec(label: &str, v: &[String]) {
         println!("{} (len={}):", label, v.len());
         for (i, s) in v.iter().enumerate() {
             println!("  {:>3}: {:?}", i, s);
@@ -351,7 +351,7 @@ fn apply_diff2<'a>(old: &Vec<&'a str>, target: &Vec<&str>, ops: &'a Vec<DiffOp>)
             println!("  {:>3}: {}", i, op);
         }
     }
-    let out = apply_diff(&old, ops)?;
+    let out = apply_diff(old, ops)?;
 
     #[cfg(debug_assertions)] {
         print_vecs("Old", old);
@@ -415,7 +415,7 @@ impl MismatchDocCow<String> for Mismatch {
 
 }
 
-pub(crate) fn diff(base: &String, input: &String) -> Vec<DiffOp> {
+pub(crate) fn diff(base: &str, input: &str) -> Vec<DiffOp> {
     let base: Vec<&str> = base.split("\n").collect();
     let a: Vec<&str> = input.split("\n").collect();
     compute_diff(&base, &a)

@@ -1,7 +1,7 @@
 use std::fs::read_to_string;
 use diff_doc::*;
 use diff_doc::txt::Mismatch;
-const BASE: &'static str = "tests/txt";
+const BASE: &str = "tests/txt";
 
 fn test_case(id: usize, a_diffs: usize, b_diffs: usize) {
     let base = read_to_string(format!("{}/case{}/base.txt", BASE, id)).unwrap();
